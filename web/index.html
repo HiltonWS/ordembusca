@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordo Realitas · Monitor de Mecânicas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#0a0908; --panel:#14110f; --panel-2:#1b1613;
+    --ink:#e7e2d7; --muted:#847c6f; --line:#2a231e;
+    --sangue:#c0202e; --morte:#3f9b6a; --conhecimento:#d4a72c;
+    --energia:#8664d6; --medo:#cfd2d8;
+    --pericia:#4fa3bd; --condicao:#d4703a; --recurso:#54b3a2; --atributo:#8bbf63;
+    --poder:#c78ab0;
+    --glow:rgba(192,32,46,.14);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--void); color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    background-image:
+      radial-gradient(120% 80% at 50% -10%, var(--glow), transparent 60%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 1px, transparent 1px 3px);
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  /* Top bar --------------------------------------------------------------*/
+  header{
+    display:flex; align-items:center; gap:16px; padding:14px 22px;
+    border-bottom:1px solid var(--line); background:rgba(10,9,8,.7);
+    backdrop-filter:blur(6px);
+  }
+  .mark{
+    font-family:'Oswald',sans-serif; font-weight:700; letter-spacing:.24em;
+    text-transform:uppercase; font-size:15px;
+  }
+  .mark small{display:block;font-weight:400;letter-spacing:.34em;font-size:9.5px;color:var(--muted);margin-top:2px}
+  .status{margin-left:auto;display:flex;align-items:center;gap:10px;
+    font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.15em}
+  .dot{width:8px;height:8px;border-radius:50%;background:#4a4038}
+  .dot.live{background:var(--sangue);box-shadow:0 0 10px var(--sangue);animation:pulse 1.8s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  /* Main -----------------------------------------------------------------*/
+  main{flex:1;display:grid;grid-template-columns:38% 62%;min-height:0}
+  .col{min-height:0;display:flex;flex-direction:column}
+  .col.feed{border-right:1px solid var(--line)}
+  .col-head{
+    font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.28em;
+    font-size:11px;color:var(--muted);padding:14px 22px 10px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .col-head::after{content:"";flex:1;height:1px;background:var(--line)}
+  .scroll{flex:1;overflow-y:auto;padding:4px 22px 22px;scrollbar-width:thin;
+    scrollbar-color:var(--line) transparent}
+  .scroll::-webkit-scrollbar{width:8px}
+  .scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+  /* Transcript feed ------------------------------------------------------*/
+  .line{font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.55;
+    padding:7px 0;border-bottom:1px dashed rgba(42,35,30,.7);color:#c8c1b4}
+  .line .ts{color:var(--sangue);opacity:.8;margin-right:10px;font-size:11px}
+  .line.new{animation:fadein .5s ease}
+  @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+  /* Mechanic cards -------------------------------------------------------*/
+  .cards{display:flex;flex-direction:column;gap:12px}
+  .card{
+    position:relative;background:linear-gradient(180deg,var(--panel-2),var(--panel));
+    border:1px solid var(--line);border-left:4px solid var(--accent,#555);
+    border-radius:3px;padding:14px 16px 15px;animation:cardin .45s cubic-bezier(.2,.7,.3,1)}
+  @keyframes cardin{from{opacity:0;transform:translateX(10px)}to{opacity:1}}
+  .card .eyebrow{font-family:'Oswald',sans-serif;text-transform:uppercase;
+    letter-spacing:.2em;font-size:10px;color:var(--accent,#999);
+    display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .card .eyebrow .cat{color:var(--muted)}
+  .card h3{margin:0;font-family:'Oswald',sans-serif;font-weight:600;
+    font-size:20px;letter-spacing:.01em;display:flex;align-items:baseline;
+    gap:10px;flex-wrap:wrap}
+  .badge{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;
+    padding:2px 7px;border-radius:2px;letter-spacing:.08em;
+    background:var(--accent,#555);color:#0a0908;text-transform:uppercase}
+  .card p.sum{margin:9px 0 0;font-size:13.5px;line-height:1.5;color:#cfc9bc}
+  .card .ref{margin-top:9px;font-family:'JetBrains Mono',monospace;font-size:10.5px;
+    color:var(--muted);letter-spacing:.05em;display:flex;gap:12px;flex-wrap:wrap}
+  .card .ref b{color:#b5ac9c;font-weight:500}
+  .count{position:absolute;top:12px;right:14px;font-family:'JetBrains Mono',monospace;
+    font-size:11px;color:var(--accent,#999);opacity:.9}
+  /* empty state ----------------------------------------------------------*/
+  .empty{color:var(--muted);font-size:13px;line-height:1.6;padding:8px 0}
+  .empty code{font-family:'JetBrains Mono',monospace;color:#b5ac9c;
+    background:var(--panel-2);padding:1px 5px;border-radius:2px}
+  /* input bar ------------------------------------------------------------*/
+  .inbar{display:flex;gap:8px;padding:12px 22px;border-top:1px solid var(--line);
+    background:rgba(10,9,8,.6)}
+  .inbar input{flex:1;background:var(--panel);border:1px solid var(--line);
+    color:var(--ink);padding:9px 12px;border-radius:3px;font-family:'JetBrains Mono',monospace;
+    font-size:12.5px}
+  .inbar input:focus{outline:none;border-color:var(--sangue)}
+  .inbar button{background:var(--sangue);color:#0a0908;border:none;padding:9px 18px;
+    border-radius:3px;font-family:'Oswald',sans-serif;text-transform:uppercase;
+    letter-spacing:.14em;font-size:12px;font-weight:600;cursor:pointer}
+  .inbar button:hover{filter:brightness(1.1)}
+  @media(max-width:820px){
+    main{grid-template-columns:1fr;grid-template-rows:1fr 1fr}
+    .col.feed{border-right:none;border-bottom:1px solid var(--line)}
+  }
+  @media(prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+  <header>
+    <div class="mark">Ordo Realitas<small>Monitor de Mecânicas · Tempo Real</small></div>
+    <div class="status"><span id="dot" class="dot"></span><span id="stat">conectando…</span></div>
+  </header>
+  <main>
+    <section class="col feed">
+      <div class="col-head">Transmissão</div>
+      <div class="scroll" id="feed">
+        <div class="empty" id="feed-empty">Aguardando fala da mesa…</div>
+      </div>
+    </section>
+    <section class="col">
+      <div class="col-head">Mecânicas em Uso</div>
+      <div class="scroll">
+        <div class="cards" id="cards">
+          <div class="empty" id="cards-empty">
+            Nenhuma mecânica ainda. Fale (ou digite abaixo) algo como
+            <code>conjura Sopro do Caos e faz teste de Ocultismo</code>.
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <div class="inbar">
+    <input id="txt" placeholder="Digite uma fala para testar a detecção…"
+           autocomplete="off">
+    <button id="send">Detectar</button>
+  </div>
+
+<script>
+const ELEM = {Sangue:'--sangue',Morte:'--morte',Conhecimento:'--conhecimento',
+              Energia:'--energia',Medo:'--medo'};
+const CAT = {ritual:'--energia',pericia:'--pericia',condicao:'--condicao',
+             recurso:'--recurso',atributo:'--atributo',poder:'--poder'};
+const CIRC = {1:'1º',2:'2º',3:'3º',4:'4º'};
+const CATLABEL = {ritual:'ritual',pericia:'perícia',condicao:'condição',
+                  recurso:'recurso',atributo:'atributo',poder:'poder'};
+const cards = document.getElementById('cards');
+const feed  = document.getElementById('feed');
+const recent = [];  // termos recentes p/ agrupar repetições
+
+function accentFor(d){
+  if(d.elemento && ELEM[d.elemento]) return `var(${ELEM[d.elemento]})`;
+  return `var(${CAT[d.category]||'--muted'})`;
+}
+function addLine(ev){
+  document.getElementById('feed-empty')?.remove();
+  const m=Math.floor(ev.start_s/60), s=Math.floor(ev.start_s%60);
+  const ts=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  const el=document.createElement('div');
+  el.className='line new';
+  el.innerHTML=`<span class="ts">${ts}</span>${escapeHtml(ev.text)}`;
+  feed.appendChild(el);
+  feed.parentElement.scrollTop=feed.parentElement.scrollHeight;
+}
+function addCard(d){
+  document.getElementById('cards-empty')?.remove();
+  // agrupa se o mesmo termo apareceu entre os 4 cards mais recentes
+  const key=d.term+'|'+d.category;
+  const existing=recent.slice(0,4).find(r=>r.key===key);
+  if(existing){
+    existing.n++; existing.node.querySelector('.count').textContent='×'+existing.n;
+    return;
+  }
+  const accent=accentFor(d);
+  const el=document.createElement('div');
+  el.className='card'; el.style.setProperty('--accent',accent);
+  const circ=d.elemento?` · ${CIRC[d.circulo]||d.circulo} círculo`:'';
+  const eyebrow=d.elemento
+     ? `${d.elemento}${circ}<span class="cat">/ ritual</span>`
+     : `${CATLABEL[d.category]||d.category}`;
+  const badge=d.elemento
+     ? `<span class="badge">${d.elemento} ${d.circulo}</span>` : '';
+  const ref=[
+     d.source?`<b>${escapeHtml(d.source)}</b>`:'',
+     d.page?`p.${d.page}`:'',
+     `conf. ${d.score}%`
+  ].filter(Boolean).join('<span>·</span>');
+  el.innerHTML=`
+     <div class="count"></div>
+     <div class="eyebrow">${eyebrow}</div>
+     <h3>${escapeHtml(d.term)} ${badge}</h3>
+     ${d.summary?`<p class="sum">${escapeHtml(d.summary)}</p>`:''}
+     <div class="ref">${ref}</div>`;
+  cards.prepend(el);
+  recent.unshift({key,n:1,node:el});
+  while(cards.children.length>60) cards.lastChild.remove();
+}
+function escapeHtml(s){return (s||'').replace(/[&<>"]/g,c=>(
+  {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function connect(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  const ws=new WebSocket(`${proto}://${location.host}/ws`);
+  const dot=document.getElementById('dot'), stat=document.getElementById('stat');
+  ws.onopen=()=>{dot.className='dot live';stat.textContent='ao vivo';};
+  ws.onclose=()=>{dot.className='dot';stat.textContent='desconectado';
+    setTimeout(connect,2000);};
+  ws.onmessage=e=>{
+    const msg=JSON.parse(e.data);
+    if(msg.type==='hello'){stat.textContent=msg.source==='demo'?'modo teste':'ao vivo';}
+    if(msg.type==='event'){
+      if(msg.text) addLine(msg);
+      (msg.detections||[]).forEach(addCard);
+    }
+    if(msg.type==='end'){stat.textContent='fim do áudio';}
+  };
+}
+connect();
+
+// input manual -> /simulate
+async function send(){
+  const i=document.getElementById('txt'); const t=i.value.trim();
+  if(!t) return; i.value='';
+  await fetch('/simulate',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({text:t})});
+}
+document.getElementById('send').onclick=send;
+document.getElementById('txt').addEventListener('keydown',e=>{if(e.key==='Enter')send();});
+</script>
+</body>
+</html>

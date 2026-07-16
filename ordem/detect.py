@@ -1,0 +1,186 @@
+"""Detecção de mecânicas em texto de fala transcrita.
+
+Recebe uma linha de transcrição, normaliza e casa (fuzzy) contra o léxico.
+A tolerância fuzzy absorve os erros típicos de STT ("ocultismo"->"ocultismo",
+"lâminas de sangue" mal transcrito etc.).
+
+Projetado para uso em tempo real: carregue o léxico uma vez, chame
+detect() a cada trecho de transcrição.
+"""
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+
+from rapidfuzz import fuzz
+
+from .extract import normalize_term
+
+
+# --- Chave fonética pt-BR ---------------------------------------------------
+# Reduz variações de transcrição a uma forma aproximada: ss/ç/sc→s,
+# ch→x, qu/c(hard)→k, c(e/i)→s, z→s, remove h mudo, colapsa letras dobradas.
+def phonetic_pt(s: str) -> str:
+    out = []
+    for w in s.split():
+        w = w.replace("lh", "l").replace("nh", "n")
+        w = w.replace("ch", "x")
+        w = w.replace("qu", "k").replace("q", "k")
+        w = re.sub(r"c([ei])", r"s\1", w)   # ce/ci -> se/si
+        w = w.replace("ss", "s").replace("sc", "s").replace("ç", "s")
+        w = w.replace("c", "k")             # c restante -> som duro
+        w = w.replace("z", "s")
+        w = w.replace("ph", "f")
+        w = re.sub(r"h", "", w)             # h mudo
+        w = re.sub(r"y", "i", w)
+        w = re.sub(r"(.)\1+", r"\1", w)     # colapsa letras dobradas
+        out.append(w)
+    return " ".join(out)
+
+# Termos que também são palavras comuns do português — só contam como
+# mecânica se houver um "gatilho" de jogo por perto (evita falso-positivo
+# em conversa normal). Valores são formas já normalizadas.
+AMBIGUOUS_FORMS = {
+    "luta", "crime", "artes", "vontade", "religiao", "profissao", "ciencias",
+    "forca", "presenca", "vida", "esforco", "resistencia", "dano", "vigor",
+    "luz",
+}
+
+# Palavras que sinalizam uso de mecânica na mesa.
+TRIGGERS = {
+    "teste", "testes", "testa", "testar", "rola", "rolar", "role",
+    "rolou", "faz", "fazer", "faca", "faça", "fiz", "pericia", "pericias",
+    "prova", "dificuldade", "dt", "treinado", "bonus", "checagem", "dado",
+    "dados", "d20", "conjura", "conjurar", "conjuro", "ritual", "gasta",
+    "gastar", "recupera", "recuperar", "perde", "perder", "sofre", "sofrer",
+    "reduz", "ataque", "atacar", "ataca", "pontos", "ponto", "resistencia",
+    "lanca", "lancar", "lanco", "usa", "usar", "ativa", "ativar", "ativo",
+}
+
+
+@dataclass
+class Detection:
+    term: str
+    category: str
+    score: float
+    meta: dict
+    summary: str | None
+    page: int | None
+    source: str | None
+    matched_text: str
+
+
+class Detector:
+    def __init__(self, lexicon: list[dict], threshold: float = 86.0):
+        self.threshold = threshold
+        # pré-computa cada forma: (form, form_ns, form_ph_ns, nwords, entry)
+        self.forms: list[tuple] = []
+        for e in lexicon:
+            raw_forms = {normalize_term(e["term"])}
+            for a in e.get("aliases", []):
+                raw_forms.add(normalize_term(a))
+            for f in raw_forms:
+                if not f:
+                    continue
+                nwords = len(f.split())
+                form_ns = f.replace(" ", "")
+                form_ph = phonetic_pt(f).replace(" ", "")
+                self.forms.append((f, form_ns, form_ph, nwords, e))
+        self.forms.sort(key=lambda x: -x[3])   # expressões maiores primeiro
+
+    @staticmethod
+    def _threshold_for(form_ns: str, nwords: int, base: float) -> float:
+        if len(form_ns) <= 3:
+            return 100.0            # siglas exigem match exato
+        if nwords >= 3:
+            return 84.0
+        if nwords == 2:
+            return 85.0
+        return max(base, 88.0)      # 1 palavra: rígido
+
+    def detect(self, text: str) -> list[Detection]:
+        norm = normalize_term(text)
+        if not norm:
+            return []
+        tokens = norm.split()
+        ph_tokens = phonetic_pt(norm).split()
+        # alinhamento defensivo (phonetic_pt preserva a contagem de palavras)
+        if len(ph_tokens) != len(tokens):
+            ph_tokens = tokens
+        found: dict[tuple[str, str], Detection] = {}
+
+        for form, form_ns, form_ph, nwords, entry in self.forms:
+            thr = self._threshold_for(form_ns, nwords, self.threshold)
+            best, best_span = 0.0, ""
+            # janelas de nwords-1 a nwords+1 tokens (absorve divisão/junção)
+            for w in range(max(1, nwords - 1), nwords + 2):
+                if w > len(tokens):
+                    continue
+                for i in range(0, len(tokens) - w + 1):
+                    span_toks = tokens[i:i + w]
+                    span = " ".join(span_toks)
+                    span_ns = "".join(span_toks)
+                    # guarda de comprimento: evita casar janela curta com
+                    # termo longo (e vice-versa), fonte de falso-positivo
+                    if len(form_ns) > 3 and not (
+                            0.6 * len(form_ns) <= len(span_ns) <= 1.7 * len(form_ns)):
+                        continue
+                    # 1) espaçado, 2) colado (splits), 3) fonético colado
+                    s = fuzz.ratio(form, span)
+                    if len(form_ns) > 3:
+                        s = max(s, fuzz.ratio(form_ns, span_ns))
+                        span_ph = "".join(ph_tokens[i:i + w])
+                        s = max(s, fuzz.ratio(form_ph, span_ph))
+                    if s > best:
+                        best, best_span = s, span
+            if best >= thr:
+                key = (entry["term"], entry["category"])
+                if key not in found or best > found[key].score:
+                    found[key] = Detection(
+                        term=entry["term"], category=entry["category"],
+                        score=round(best, 1), meta=entry.get("meta", {}),
+                        summary=entry.get("summary"),
+                        page=entry.get("page"),
+                        source=entry.get("title") or entry.get("filename"),
+                        matched_text=best_span,
+                    )
+
+        results = sorted(found.values(), key=lambda d: -d.score)
+        results = self._gate_ambiguous(results, tokens)
+        return self._suppress_substrings(results)
+
+    @staticmethod
+    def _gate_ambiguous(dets: list[Detection], tokens: list[str]) -> list[Detection]:
+        """Termo que também é palavra comum só conta com um gatilho de jogo."""
+        has_trigger = any(t in TRIGGERS for t in tokens)
+        if has_trigger:
+            return dets
+        kept = []
+        for d in dets:
+            amb = (d.matched_text in AMBIGUOUS_FORMS
+                   or normalize_term(d.term) in AMBIGUOUS_FORMS)
+            if amb:
+                continue
+            kept.append(d)
+        return kept
+
+    @staticmethod
+    def _suppress_substrings(dets: list[Detection]) -> list[Detection]:
+        """Remove detecção cujo trecho casado está contido no de outra maior.
+
+        Ex.: "presença do medo" (ritual) engole "presença" (atributo).
+        """
+        kept: list[Detection] = []
+        spans = sorted(dets, key=lambda d: -len(d.matched_text))
+        for d in spans:
+            covered = any(
+                d is not o
+                and d.matched_text
+                and d.matched_text in o.matched_text
+                and len(d.matched_text) < len(o.matched_text)
+                and o.score >= d.score - 0.5      # não engole um match mais forte
+                for o in kept
+            )
+            if not covered:
+                kept.append(d)
+        return sorted(kept, key=lambda d: -d.score)

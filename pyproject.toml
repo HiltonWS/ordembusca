@@ -1,0 +1,41 @@
+[project]
+name = "ordem-mecanicas"
+version = "1.0.0"
+description = "Detector de mecânicas de Ordem Paranormal em tempo real: voz → transcrição local → mecânicas na tela, com referência aos livros"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "PyMuPDF>=1.24",
+    "rapidfuzz>=3.0",
+]
+
+[project.optional-dependencies]
+voz = [
+    "faster-whisper>=1.0",
+    "webrtcvad-wheels>=2.0",
+    "soundfile>=0.12",
+    "numpy>=1.24",
+    "sounddevice>=0.4",
+]
+web = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "pydantic>=2.0",
+]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_detector.py"]

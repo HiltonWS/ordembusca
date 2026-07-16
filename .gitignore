@@ -1,0 +1,31 @@
+# ─── Material com direitos autorais: NUNCA versionar ───
+# Os livros de Ordem Paranormal e o banco derivado deles ficam locais.
+*.pdf
+*.db
+*.db-journal
+uploads/
+livros/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Modelos e caches de STT (baixados em runtime)
+.cache/
+models/
+
+# SO / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Áudio de sessões
+*.wav
+*.mp3
+*.ogg

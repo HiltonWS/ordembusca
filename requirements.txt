@@ -1,0 +1,15 @@
+# Fase 1 — ingestão e detecção
+PyMuPDF>=1.24
+rapidfuzz>=3.0
+
+# Fase 2 — voz (STT local, offline após 1º download do modelo)
+faster-whisper>=1.0        # transcrição local (CTranslate2)
+webrtcvad-wheels>=2.0      # detecção de voz / segmentação (wheels prontas)
+soundfile>=0.12            # leitura de WAV
+numpy>=1.24
+sounddevice>=0.4           # captura de microfone (requer PortAudio no SO)
+
+# Fase 3 — página web ao vivo
+fastapi>=0.110
+uvicorn>=0.29
+pydantic>=2.0
