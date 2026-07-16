@@ -24,6 +24,12 @@ _WATERMARK_PATTERNS = [
 class Page:
     number: int          # 1-indexed
     text: str            # texto limpo
+    loc: str | None = None   # rótulo de localização legível (ex: nome da seção
+                              # para fontes sem paginação real); None -> usa "p.N"
+
+    @property
+    def display_loc(self) -> str:
+        return self.loc or f"p.{self.number}"
 
 
 @dataclass
@@ -123,6 +129,47 @@ def _title_from_filename(path: Path) -> str:
     return name or path.stem
 
 
+_TITLE_STYLES = {"Title", "Heading 1"}
+
+
+def load_docx(path: Path) -> Source:
+    """Extrai um .docx preservando as seções reais (estilos Título/Heading 1)
+    como 'páginas' lógicas — cada uma vira o rótulo de localização (loc)
+    exibido nas referências, já que docx não tem paginação real.
+    """
+    import docx  # python-docx
+
+    doc = docx.Document(str(path))
+    pages: list[Page] = []
+    section_title: str | None = None
+    buf: list[str] = []
+
+    def flush():
+        nonlocal buf
+        text = _clean_page_text("\n".join(buf))
+        if text:
+            # injeta o título em CAIXA ALTA como 1ª linha: permite que
+            # chunk.py detecte a seção real do mesmo jeito que faz com
+            # os cabeçalhos em caixa alta dos PDFs.
+            head = section_title.upper() if section_title else None
+            full = f"{head}\n\n{text}" if head else text
+            pages.append(Page(number=len(pages) + 1, text=full,
+                              loc=section_title))
+        buf = []
+
+    for p in doc.paragraphs:
+        style = p.style.name if p.style else ""
+        if style in _TITLE_STYLES and p.text.strip():
+            flush()
+            section_title = p.text.strip()
+            continue
+        buf.append(p.text)
+    flush()
+
+    return Source(path=path, title=_title_from_filename(path),
+                  sha256=_sha256(path), pages=pages)
+
+
 def load(path: str | Path) -> Source:
     path = Path(path)
     ext = path.suffix.lower()
@@ -130,6 +177,8 @@ def load(path: str | Path) -> Source:
         return load_pdf(path)
     if ext in (".txt", ".md"):
         return load_txt(path)
+    if ext == ".docx":
+        return load_docx(path)
     raise ValueError(f"Extensão não suportada: {ext}")
 
 

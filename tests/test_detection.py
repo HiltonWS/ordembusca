@@ -138,6 +138,16 @@ NEG_DIFICIL = [
 ]
 
 
+# fonte .docx: elemento homebrew "Profundezas", poderes paranormais e
+# referência por seção (sem número de página real)
+DOCX_FONTE = [
+    ("ela conjura Abyssum Gate e abre uma cratera no chão", {"Abyssum Gate"}),
+    ("uso Sentidos Apurados pra enxergar no escuro", {"Sentidos Apurados"}),
+    ("ativo Antecipar e bloqueio o ataque à distância", {"Antecipar"}),
+    ("conjura Túmulo Pelágico contra o grupo", {"Túmulo Pelágico"}),
+]
+
+
 def run_group(det: Detector, name: str, cases: list) -> tuple[int, int]:
     print(f"\n{name}")
     ok = 0
@@ -172,8 +182,8 @@ def run_negativos(det: Detector) -> tuple[int, int]:
 
 def run_cobertura_rituais(det: Detector, conn) -> tuple[int, int]:
     """Cada ritual deve ser detectado quando 'falado' numa frase."""
-    print("\nCOBERTURA DE RITUAIS (todos os 81)")
     rows = conn.execute("SELECT term FROM lexicon WHERE category='ritual'").fetchall()
+    print(f"\nCOBERTURA DE RITUAIS (todos os {len(rows)})")
     ok, falhas = 0, []
     for r in rows:
         nome = r["term"]
@@ -197,7 +207,8 @@ def main() -> int:
     for name, cases in [("POSITIVOS", POSITIVOS), ("RUÍDO DE STT", STT_RUIDO),
                         ("STT DIFÍCIL (partidas/distorção)", STT_DIFICIL),
                         ("AMBÍGUOS COM GATILHO", AMBIGUOS_COM_GATILHO),
-                        ("PODERES HOMEBREW", HOMEBREW)]:
+                        ("PODERES HOMEBREW", HOMEBREW),
+                        ("FONTE .DOCX (Profundezas, poderes paranormais)", DOCX_FONTE)]:
         o, t = run_group(det, name, cases)
         total_ok += o
         total += t

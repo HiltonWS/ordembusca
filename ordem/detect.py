@@ -66,8 +66,17 @@ class Detection:
     meta: dict
     summary: str | None
     page: int | None
+    loc: str | None
     source: str | None
     matched_text: str
+
+
+def format_ref(d: Detection) -> str:
+    """'Livro p.135' (página real) ou 'Homebrew · Seção X' (sem paginação)."""
+    if not d.source:
+        return ""
+    loc = d.loc or (f"p.{d.page}" if d.page else None)
+    return f"{d.source} · {loc}" if loc else d.source
 
 
 class Detector:
@@ -140,7 +149,7 @@ class Detector:
                         term=entry["term"], category=entry["category"],
                         score=round(best, 1), meta=entry.get("meta", {}),
                         summary=entry.get("summary"),
-                        page=entry.get("page"),
+                        page=entry.get("page"), loc=entry.get("loc"),
                         source=entry.get("title") or entry.get("filename"),
                         matched_text=best_span,
                     )

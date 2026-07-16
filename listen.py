@@ -27,7 +27,8 @@ def print_event(ev) -> None:
     for d in ev.detections:
         cor = CORES.get(d["category"], "")
         extra = f" [{d['elemento']} {d['circulo']}]" if d.get("elemento") else ""
-        ref = f" — {d['source']} p.{d['page']}" if d.get("page") else ""
+        loc = d.get("loc") or (f"p.{d['page']}" if d.get("page") else None)
+        ref = f" — {d['source']} · {loc}" if d.get("source") and loc else ""
         print(f"       {cor}● {d['category']:9s}{RESET} {d['term']}{extra}"
               f"  ({d['score']}%){ref}")
         if d.get("summary"):

@@ -18,20 +18,30 @@ todas funcionais e testadas. Roda inteiramente na sua máquina.
 
 ## O que já funciona
 
-1. **Ingestão** de PDFs e TXT → limpa marca d'água, junta palavras quebradas
-   por hífen, divide em chunks com página e seção.
+1. **Ingestão** de PDFs, TXT e **DOCX** → limpa marca d'água, junta palavras
+   quebradas por hífen, divide em chunks com página/seção. Para `.docx`,
+   as seções reais do Word (estilos Título/Heading) viram os "capítulos"
+   da fonte — úteis como referência quando não há paginação real.
 2. **Léxico automático** de mecânicas:
    - **Rituais** extraídos dos livros pelo padrão `Nome / ELEMENTO Círculo`
-     (ex.: *Sopro do Caos — Energia 2*), com página.
+     (ex.: *Sopro do Caos — Energia 2*), com página ou seção.
+   - **Poderes Paranormais** — mesma estrutura de campos dos rituais, mas
+     reconhecidos como categoria própria quando a seção da fonte indica
+     "Poderes" (em vez de "Rituais").
+   - **Poderes** (formato `[Nome] - descrição`, comum em fichas/homebrew).
    - **Perícias, condições, recursos e atributos** canônicos do sistema.
+   - Suporta **elementos homebrew customizados** além dos 5 oficiais
+     (Sangue, Morte, Conhecimento, Energia, Medo) — ex.: um 6º elemento
+     "Profundezas" de uma campanha de tema marítimo.
 3. **Busca full-text** (SQLite FTS5, sem acento) para trazer o texto da regra.
 4. **Detector** que recebe uma frase (a fala transcrita) e casa, com
-   tolerância a erros de transcrição (fuzzy), contra o léxico — devolvendo
-   a mecânica, categoria, elemento/círculo e a referência (livro + página).
+   tolerância a erros de transcrição (fuzzy + fonética pt-BR), contra o
+   léxico — devolvendo a mecânica, categoria, elemento/círculo e a
+   referência (livro + página, ou fonte + seção).
 
 ### Números da ingestão atual
-- 3 fontes · 897 chunks · 153 termos de léxico
-- **81 rituais** detectados automaticamente, 27 perícias, 34 condições
+- 3 fontes (2 PDF + 1 DOCX) · 922 chunks · **231 termos** de léxico
+- **97 rituais**, 62 poderes, 34 condições, 27 perícias, 6 recursos, 5 atributos
 
 ---
 
@@ -182,10 +192,11 @@ python -m pytest tests/ -v          # suíte pytest (a mesma do CI)
 python tests/test_detection.py      # runner colorido no terminal
 ```
 
-A suíte cobre: rituais dos 5 elementos, perícias, condições, recursos,
-poderes homebrew, robustez a ruído de STT (acentos, erros fonéticos,
-**palavras partidas** e **distorção pesada**), casos negativos difíceis e
-cobertura dos 81 rituais (este último só roda se `ordem.db` existir).
+A suíte cobre: rituais dos 5 elementos oficiais + o homebrew "Profundezas",
+perícias, condições, recursos, poderes (colchetes e Poderes Paranormais),
+robustez a ruído de STT (acentos, erros fonéticos, **palavras partidas** e
+**distorção pesada**), casos negativos difíceis, fontes **.docx** e
+cobertura de todos os 97 rituais (este último só roda se `ordem.db` existir).
 
 **CI**: o workflow em `.github/workflows/ci.yml` roda pytest (Python 3.11 e
 3.12) e ruff a cada push/PR. Como os livros não são versionados, os testes
@@ -193,9 +204,10 @@ no CI usam a fixture de `tests/fixtures.py` — termos canônicos do sistema +
 entradas sintéticas — cobrindo o detector por completo sem o material
 protegido.
 
-Estresse amplo sobre todo o léxico (199 termos): **100%** de detecção com
-fala limpa e **~91%** com erros aleatórios de STT (queda concentrada nas
-siglas curtas — PE, PV, SAN, NEX — que exigem match exato de propósito).
+Estresse amplo sobre todo o léxico (231 termos, com `ordem.db` local):
+**100%** de detecção com fala limpa e **93%** com erros aleatórios de STT
+(queda concentrada nas siglas curtas — PE, PV, SAN, NEX — que exigem match
+exato de propósito).
 
 O detector aguenta transcrição bem imperfeita. Exemplo real:
 *"o okultista gasta 3 pe e konjura sopro do ca os, todos rolam resistensia

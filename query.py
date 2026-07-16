@@ -12,7 +12,7 @@ import argparse
 import sys
 
 from ordem import db as dbmod
-from ordem.detect import Detector
+from ordem.detect import Detector, format_ref
 
 
 def main() -> int:
@@ -40,7 +40,7 @@ def main() -> int:
     print(f'Fala: "{args.texto}"\n')
     for d in detections:
         extra = f" [{d.meta['elemento']} {d.meta['circulo']}]" if d.meta.get("elemento") else ""
-        ref = f" — {d.source} p.{d.page}" if d.page else ""
+        ref = f" — {format_ref(d)}" if d.source else ""
         print(f"● {d.category.upper():9s} {d.term}{extra}  ({d.score}%){ref}")
         if d.summary:
             print(f"    ↳ {d.summary}")

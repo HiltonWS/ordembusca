@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS lexicon (
     aliases    TEXT,              -- JSON array
     meta       TEXT,              -- JSON object
     summary    TEXT,              -- resumo curto da regra
+    loc        TEXT,              -- rótulo de localização (seção, se sem página real)
     source_id  INTEGER REFERENCES sources(id) ON DELETE CASCADE,
     page       INTEGER,
     UNIQUE(norm, category)
@@ -74,11 +75,13 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
-    # migração leve: garante a coluna summary em bancos antigos
+    # migração leve: garante colunas novas em bancos antigos
     cols = {r[1] for r in conn.execute("PRAGMA table_info(lexicon)")}
     if "summary" not in cols:
         conn.execute("ALTER TABLE lexicon ADD COLUMN summary TEXT")
-        conn.commit()
+    if "loc" not in cols:
+        conn.execute("ALTER TABLE lexicon ADD COLUMN loc TEXT")
+    conn.commit()
     return conn
 
 
@@ -119,15 +122,16 @@ def ingest_source(conn: sqlite3.Connection, source: Source,
     for e in lexicon:
         try:
             conn.execute(
-                "INSERT INTO lexicon(term,norm,category,aliases,meta,summary,source_id,page) "
-                "VALUES(?,?,?,?,?,?,?,?) "
+                "INSERT INTO lexicon(term,norm,category,aliases,meta,summary,loc,source_id,page) "
+                "VALUES(?,?,?,?,?,?,?,?,?) "
                 "ON CONFLICT(norm,category) DO UPDATE SET "
-                "page=COALESCE(lexicon.page, excluded.page), "
+                "page=CASE WHEN lexicon.page IS NULL THEN excluded.page ELSE lexicon.page END, "
+                "loc=CASE WHEN lexicon.page IS NULL THEN excluded.loc ELSE lexicon.loc END, "
                 "summary=COALESCE(excluded.summary, lexicon.summary)",
                 (e.term, normalize_term(e.term), e.category,
                  json.dumps(e.aliases, ensure_ascii=False),
                  json.dumps(e.meta, ensure_ascii=False),
-                 e.summary,
+                 e.summary, e.loc,
                  sid if e.source_filename else None, e.page),
             )
             lex_rows += 1
@@ -189,7 +193,7 @@ def context_for_page(conn: sqlite3.Connection, filename: str,
 
 def all_lexicon(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute(
-        "SELECT l.term,l.norm,l.category,l.aliases,l.meta,l.summary,l.page,"
+        "SELECT l.term,l.norm,l.category,l.aliases,l.meta,l.summary,l.loc,l.page,"
         "       s.title,s.filename "
         "FROM lexicon l LEFT JOIN sources s ON s.id=l.source_id"
     ).fetchall()

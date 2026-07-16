@@ -29,7 +29,7 @@ def _detection_to_dict(d: Detection) -> dict:
         "term": d.term, "category": d.category, "score": d.score,
         "elemento": d.meta.get("elemento"), "circulo": d.meta.get("circulo"),
         "summary": d.summary,
-        "page": d.page, "source": d.source,
+        "page": d.page, "loc": d.loc, "source": d.source,
     }
 
 

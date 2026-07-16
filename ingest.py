@@ -20,7 +20,7 @@ from ordem import extract
 from ordem.chunk import chunk_source
 from ordem.lexicon import build_lexicon
 
-SUPPORTED = {".pdf", ".txt", ".md"}
+SUPPORTED = {".pdf", ".txt", ".md", ".docx"}
 
 
 def collect_paths(inputs: list[str]) -> list[Path]:

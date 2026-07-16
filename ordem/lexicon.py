@@ -19,12 +19,13 @@ from .extract import Source, normalize_term
 @dataclass
 class LexEntry:
     term: str
-    category: str                       # ritual|pericia|condicao|recurso|atributo
+    category: str                       # ritual|pericia|condicao|recurso|atributo|poder
     aliases: list[str] = field(default_factory=list)
     meta: dict = field(default_factory=dict)
     summary: str | None = None          # resumo curto da regra
     source_filename: str | None = None
     page: int | None = None
+    loc: str | None = None              # rótulo de localização (seção, se houver)
 
     def all_forms(self) -> list[str]:
         return [self.term, *self.aliases]
@@ -118,11 +119,13 @@ PERICIA_SUMMARY = {
     "Vontade": "Resistência mental a medo e controle (Presença).",
 }
 
-ELEMENTOS = ["SANGUE", "MORTE", "CONHECIMENTO", "ENERGIA", "MEDO"]
+ELEMENTOS = ["SANGUE", "MORTE", "CONHECIMENTO", "ENERGIA", "MEDO",
+             "PROFUNDEZAS"]   # "Profundezas": 6º elemento homebrew (Alto Mar)
 
-# padrão da linha de elemento+círculo de um ritual, ex: " MEDO 4 "
+# padrão da linha de elemento+círculo de um ritual: " MEDO 4 " (PDF, maiúsculo)
+# ou " Sangue 1 " (docx homebrew, capitalizado) — aceita qualquer capitalização
 _RITUAL_HEADER = re.compile(
-    r"^\s*(" + "|".join(ELEMENTOS) + r")\s*([1-4])\s*$"
+    r"^\s*(" + "|".join(ELEMENTOS) + r")\s*([1-4])\s*$", re.I
 )
 
 
@@ -141,21 +144,30 @@ def _looks_like_ritual_name(line: str) -> bool:
 
 
 _RITUAL_FIELDS = re.compile(
-    r"^(Execução|Alcance|Alvo|Área|Area|Duração|Duracao|Resistência|Resistencia)\s*:",
+    r"^(Execução|Alcance|Alvo|Área|Area|Duração|Duracao|Resistência|Resistencia)"
+    r"\s*[:\-–—]",
     re.I,
 )
+_RITUAL_DESC = re.compile(r"^Descrição\s*[:\-–—]\s*(.*)", re.I)
+_RITUAL_TIER = re.compile(r"^(Discente|Verdadeiro|Afinidade)\b", re.I)  # upgrades
 
 
 def _ritual_summary(lines: list[str], header_idx: int) -> str | None:
     """Compõe um resumo a partir das linhas após o cabeçalho do ritual."""
     fields: list[str] = []
     effect: list[str] = []
-    for line in lines[header_idx + 1: header_idx + 20]:
+    for line in lines[header_idx + 1: header_idx + 24]:
         s = line.strip()
         if not s:
-            continue
+            break                              # linha em branco = fim do bloco
         if _RITUAL_HEADER.match(line):        # começou outro ritual
             break
+        if _RITUAL_TIER.match(s):             # Discente/Verdadeiro: pula
+            continue
+        m = _RITUAL_DESC.match(s)
+        if m:
+            effect.append(m.group(1))
+            continue
         if _RITUAL_FIELDS.match(s):
             fields.append(re.sub(r"\s+", " ", s))
         else:
@@ -165,19 +177,40 @@ def _ritual_summary(lines: list[str], header_idx: int) -> str | None:
         parts.append(" · ".join(fields))
     if effect:
         text = " ".join(effect)
-        # primeiras 1-2 frases do efeito
         sentences = re.split(r"(?<=[.!?])\s+", text)
         parts.append(" ".join(sentences[:2]).strip())
     summary = " — ".join(parts)
-    return summary[:400] if summary else None
+    return _trim(summary, 400) if summary else None
+
+
+def _has_ritual_fields_nearby(lines: list[str], header_idx: int) -> bool:
+    """Confirma que é um bloco de verdade (não uma linha solta de tabela/
+    pré-requisito): exige um campo ou nível de upgrade reconhecível logo
+    após o cabeçalho (Execução/Alcance/Descrição/Afinidade/Discente...)."""
+    for line in lines[header_idx + 1: header_idx + 10]:
+        s = line.strip()
+        if not s:
+            break
+        if _RITUAL_FIELDS.match(s) or _RITUAL_DESC.match(s) or _RITUAL_TIER.match(s):
+            return True
+    return False
 
 
 def extract_rituais(source: Source) -> list[LexEntry]:
-    """Detecta rituais pelo padrão: <Nome>\\n <ELEMENTO><Círculo>."""
+    """Detecta rituais/poderes paranormais pelo padrão: <Nome>\\n <ELEMENTO><Círculo>.
+
+    Esse padrão de campos (Execução/Alcance/Duração...) é usado tanto para
+    Rituais quanto para Poderes Paranormais nos livros/homebrew. Quando a
+    fonte tem seção (loc) identificável, usamos-a para categorizar certo;
+    sem seção (PDFs oficiais), assume-se "ritual" (comportamento original).
+    """
     entries: list[LexEntry] = []
     seen: set[str] = set()
     for page in source.pages:
         lines = page.text.split("\n")
+        category = "ritual"
+        if page.loc and "poder" in page.loc.lower():
+            category = "poder"
         for i, line in enumerate(lines):
             m = _RITUAL_HEADER.match(line)
             if not m:
@@ -193,17 +226,20 @@ def extract_rituais(source: Source) -> list[LexEntry]:
                 break
             if not name:
                 continue
-            key = normalize_term(name)
+            if not _has_ritual_fields_nearby(lines, i):
+                continue    # provável linha solta de tabela/pré-requisito
+            key = normalize_term(name) + "|" + category
             if key in seen:
                 continue
             seen.add(key)
             entries.append(LexEntry(
                 term=name,
-                category="ritual",
+                category=category,
                 meta={"elemento": elemento.capitalize(), "circulo": circulo},
                 summary=_ritual_summary(lines, i),
                 source_filename=source.filename,
                 page=page.number,
+                loc=page.loc,
             ))
     return entries
 
@@ -212,9 +248,9 @@ def extract_rituais(source: Source) -> list[LexEntry]:
 _COND_ENTRY = re.compile(r"^([A-ZÀ-Ú][a-zà-ú]+)\.\s+(.*)")
 
 
-def extract_condicao_summaries(source: Source) -> dict[str, tuple[str, int]]:
-    """Extrai {nome_normalizado: (descrição, página)} do apêndice de condições."""
-    out: dict[str, tuple[str, int]] = {}
+def extract_condicao_summaries(source: Source) -> dict[str, tuple[str, int, str | None]]:
+    """Extrai {nome_normalizado: (descrição, página, loc)} do apêndice de condições."""
+    out: dict[str, tuple[str, int, str | None]] = {}
     known = {normalize_term(c) for c in CONDICOES}
     in_appendix = False
     for page in source.pages:
@@ -223,7 +259,6 @@ def extract_condicao_summaries(source: Source) -> dict[str, tuple[str, int]]:
             in_appendix = True
         if not in_appendix:
             continue
-        # o apêndice de condições vai até começar a próxima seção em CAIXA ALTA
         lines = text.split("\n")
         cur_name = None
         cur_desc: list[str] = []
@@ -233,7 +268,7 @@ def extract_condicao_summaries(source: Source) -> dict[str, tuple[str, int]]:
                 norm = normalize_term(cur_name)
                 if norm in known and norm not in out:
                     desc = re.sub(r"\s+", " ", " ".join(cur_desc)).strip()
-                    out[norm] = (_trim(desc, 300), page.number)
+                    out[norm] = (_trim(desc, 300), page.number, page.loc)
 
         for line in lines:
             m = _COND_ENTRY.match(line.strip())
@@ -243,7 +278,6 @@ def extract_condicao_summaries(source: Source) -> dict[str, tuple[str, int]]:
             elif cur_name:
                 cur_desc.append(line.strip())
         commit()
-        # heurística: para de varrer se saiu do apêndice (seção nova longa)
         if in_appendix and "APÊNDICE" in text and out and \
            text.count("APÊNDICE") and page.number > 0 and len(out) >= 5 and \
            "CONDIÇÕES" not in text:
@@ -264,12 +298,12 @@ def _trim(text: str, limit: int) -> str:
     return cut.rsplit(" ", 1)[0].rstrip(",;:") + "…"
 
 
-def _find_page_of(source: Source, term: str) -> int | None:
+def _find_page_of(source: Source, term: str) -> tuple[int | None, str | None]:
     norm = normalize_term(term)
     for page in source.pages:
         if norm in normalize_term(page.text):
-            return page.number
-    return None
+            return page.number, page.loc
+    return None, None
 
 
 def canonical_entries(source: Source | None = None) -> list[LexEntry]:
@@ -282,19 +316,19 @@ def canonical_entries(source: Source | None = None) -> list[LexEntry]:
         e = LexEntry(name, "pericia", summary=PERICIA_SUMMARY.get(name))
         if source:
             e.source_filename = source.filename
-            e.page = _find_page_of(source, name)
+            e.page, e.loc = _find_page_of(source, name)
         out.append(e)
 
     for name in CONDICOES:
         e = LexEntry(name, "condicao")
         norm = normalize_term(name)
         if norm in cond_summaries:
-            e.summary, page = cond_summaries[norm]
-            e.page = page
+            e.summary, page, loc = cond_summaries[norm]
+            e.page, e.loc = page, loc
             e.source_filename = source.filename if source else None
         elif source:
             e.source_filename = source.filename
-            e.page = _find_page_of(source, name)
+            e.page, e.loc = _find_page_of(source, name)
         out.append(e)
 
     for e in RECURSOS + ATRIBUTOS:
@@ -333,5 +367,6 @@ def extract_poderes(source: Source) -> list[LexEntry]:
                 term=nome, category="poder",
                 summary=_trim(desc, 300),
                 source_filename=source.filename, page=page.number,
+                loc=page.loc,
             ))
     return entries

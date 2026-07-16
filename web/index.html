@@ -12,7 +12,7 @@
     --void:#0a0908; --panel:#14110f; --panel-2:#1b1613;
     --ink:#e7e2d7; --muted:#847c6f; --line:#2a231e;
     --sangue:#c0202e; --morte:#3f9b6a; --conhecimento:#d4a72c;
-    --energia:#8664d6; --medo:#cfd2d8;
+    --energia:#8664d6; --medo:#cfd2d8; --profundezas:#1f7a8c;
     --pericia:#4fa3bd; --condicao:#d4703a; --recurso:#54b3a2; --atributo:#8bbf63;
     --poder:#c78ab0;
     --glow:rgba(192,32,46,.14);
@@ -141,7 +141,7 @@
 
 <script>
 const ELEM = {Sangue:'--sangue',Morte:'--morte',Conhecimento:'--conhecimento',
-              Energia:'--energia',Medo:'--medo'};
+              Energia:'--energia',Medo:'--medo',Profundezas:'--profundezas'};
 const CAT = {ritual:'--energia',pericia:'--pericia',condicao:'--condicao',
              recurso:'--recurso',atributo:'--atributo',poder:'--poder'};
 const CIRC = {1:'1º',2:'2º',3:'3º',4:'4º'};
@@ -185,7 +185,7 @@ function addCard(d){
      ? `<span class="badge">${d.elemento} ${d.circulo}</span>` : '';
   const ref=[
      d.source?`<b>${escapeHtml(d.source)}</b>`:'',
-     d.page?`p.${d.page}`:'',
+     d.loc ? escapeHtml(d.loc) : (d.page?`p.${d.page}`:''),
      `conf. ${d.score}%`
   ].filter(Boolean).join('<span>·</span>');
   el.innerHTML=`
