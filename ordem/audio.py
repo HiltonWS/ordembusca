@@ -167,6 +167,43 @@ def mix_float_blocks(blocks: "list[np.ndarray]") -> bytes:
     return (mix * 32767.0).astype(np.int16).tobytes()
 
 
+def _resolve_input_device(device):
+    """Resolve (índice, info) de um dispositivo de ENTRADA.
+
+    - device=None: usa a entrada padrão do sistema; se não houver,
+      cai para o primeiro dispositivo de entrada disponível.
+    - índice inválido ou de saída: erro claro listando as entradas.
+    """
+    import sounddevice as sd
+
+    if device is None:
+        try:
+            info = sd.query_devices(None, "input")
+            return info.get("index", sd.default.device[0]), info
+        except (ValueError, sd.PortAudioError):
+            for d in list_input_devices():
+                return d["index"], sd.query_devices(d["index"])
+            raise SystemExit(
+                "Nenhum dispositivo de ENTRADA de áudio encontrado. "
+                "Verifique se o microfone está conectado e se o PortAudio "
+                "está instalado (Linux: sudo apt install portaudio19-dev)."
+            ) from None
+    try:
+        return device, sd.query_devices(device, "input")
+    except (ValueError, sd.PortAudioError) as e:
+        entradas = "\n  ".join(
+            f"[{d['index']}] {d['name']}" + ("  [LOOPBACK]" if d["loopback"] else "")
+            for d in list_input_devices()
+        ) or "(nenhuma)"
+        raise SystemExit(
+            f"O dispositivo {device!r} não é um dispositivo de ENTRADA válido "
+            f"({e}).\nEntradas disponíveis:\n  {entradas}\n"
+            "Dica: use os índices mostrados por --list-mics; para capturar o "
+            "que você escuta, escolha um marcado como [LOOPBACK] (no Linux, "
+            "'Monitor of ...')."
+        ) from e
+
+
 class _DeviceReader:
     """Lê um dispositivo em thread própria e entrega float32 mono 16kHz."""
 
@@ -175,8 +212,8 @@ class _DeviceReader:
 
         import sounddevice as sd
 
-        info = sd.query_devices(device, "input")
-        self.native_sr = int(info.get("default_samplerate") or SAMPLE_RATE)
+        index, info = _resolve_input_device(device)
+        self.native_sr = SAMPLE_RATE          # ajustado após abrir o stream
         self._buf = np.zeros(0, dtype=np.float32)
         self._lock = threading.Lock()
         self._cv = threading.Condition(self._lock)
@@ -190,11 +227,20 @@ class _DeviceReader:
                 self._buf = np.concatenate([self._buf, data])
                 self._cv.notify()
 
-        self.stream = sd.InputStream(
-            device=device, channels=max(1, min(2, info["max_input_channels"])),
-            samplerate=self.native_sr, dtype="float32",
-            blocksize=0, callback=callback,
-        )
+        try:
+            # samplerate=None deixa o PortAudio escolher a taxa nativa do
+            # dispositivo (evita erro em placas que não aceitam 16 kHz).
+            self.stream = sd.InputStream(
+                device=index,
+                channels=max(1, min(2, int(info["max_input_channels"]))),
+                samplerate=None, dtype="float32",
+                blocksize=0, callback=callback,
+            )
+        except sd.PortAudioError as e:
+            raise SystemExit(
+                f"Falha ao abrir o dispositivo [{index}] {info.get('name')}: {e}"
+            ) from e
+        self.native_sr = int(self.stream.samplerate)
 
     def start(self):
         self.stream.start()
