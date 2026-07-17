@@ -1,6 +1,7 @@
 # ─── Material com direitos autorais: NUNCA versionar ───
 # Os livros de Ordem Paranormal e o banco derivado deles ficam locais.
 *.pdf
+*.docx
 *.db
 *.db-journal
 uploads/
