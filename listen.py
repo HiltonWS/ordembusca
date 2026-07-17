@@ -40,6 +40,10 @@ def main() -> int:
     src = ap.add_mutually_exclusive_group()
     src.add_argument("--mic", action="store_true", help="ouvir o microfone")
     src.add_argument("--wav", help="processar um arquivo WAV")
+    src.add_argument("--devices", type=int, nargs="+", metavar="N",
+                     help="mixar 2+ dispositivos (ex: --devices 1 5 = "
+                          "microfone + loopback do sistema, para ouvir "
+                          "o que você fala E o que você escuta)")
     ap.add_argument("--db", default="ordem.db")
     ap.add_argument("--model", default="small",
                     help="tiny|base|small|medium|large-v3 (default: small)")
@@ -53,26 +57,33 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.list_mics:
-        import sounddevice as sd
-        for i, d in enumerate(sd.query_devices()):
-            if d["max_input_channels"] > 0:
-                print(f"  [{i}] {d['name']}")
+        from ordem.audio import list_input_devices
+        print("Dispositivos de entrada ([LOOPBACK] = captura o que você escuta):")
+        for d in list_input_devices():
+            tag = "  [LOOPBACK]" if d["loopback"] else ""
+            print(f"  [{d['index']}] {d['name']}{tag}")
+        print("\nPara ouvir a mesa inteira (sua voz + Discord no fone):")
+        print("  python listen.py --devices <mic> <loopback>")
         return 0
 
-    if not args.mic and not args.wav:
-        ap.error("escolha --mic ou --wav (ou --list-mics)")
+    if not args.mic and not args.wav and not args.devices:
+        ap.error("escolha --mic, --wav ou --devices (ou --list-mics)")
 
-    from ordem.audio import frames_from_mic, frames_from_wav
+    from ordem.audio import frames_from_devices, frames_from_mic, frames_from_wav
     from ordem.pipeline import Pipeline
 
     print(f"Carregando modelo Whisper '{args.model}' ({args.device})...",
           file=sys.stderr)
     pipe = Pipeline(args.db, args.model, args.device, args.compute)
-    print("Pronto. Ouvindo..." if args.mic else "Processando áudio...",
-          file=sys.stderr)
+    print("Pronto. Ouvindo..." if (args.mic or args.devices)
+          else "Processando áudio...", file=sys.stderr)
 
-    frames = (frames_from_mic(args.mic_device) if args.mic
-              else frames_from_wav(args.wav))
+    if args.devices:
+        frames = frames_from_devices(args.devices)
+    elif args.mic:
+        frames = frames_from_mic(args.mic_device)
+    else:
+        frames = frames_from_wav(args.wav)
     try:
         for ev in pipe.run(frames, aggressiveness=args.aggressiveness):
             print_event(ev)

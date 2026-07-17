@@ -148,6 +148,15 @@ DOCX_FONTE = [
 ]
 
 
+# conteúdo dos pacotes oficiais Arquivos Secretos
+ARQUIVOS_SECRETOS = [
+    ("conjuro Hesitação Forçada no capanga", {"Hesitação Forçada"}),
+    ("ela conjura Labirinto Mental no cultista", {"Labirinto Mental"}),
+    ("usa Mapa Sanguíneo pra rastrear o alvo", {"Mapa Sanguíneo"}),
+    ("o personagem fica trêmulo de pânico", {"Trêmulo"}),
+]
+
+
 def run_group(det: Detector, name: str, cases: list) -> tuple[int, int]:
     print(f"\n{name}")
     ok = 0
@@ -208,7 +217,8 @@ def main() -> int:
                         ("STT DIFÍCIL (partidas/distorção)", STT_DIFICIL),
                         ("AMBÍGUOS COM GATILHO", AMBIGUOS_COM_GATILHO),
                         ("PODERES HOMEBREW", HOMEBREW),
-                        ("FONTE .DOCX (Profundezas, poderes paranormais)", DOCX_FONTE)]:
+                        ("FONTE .DOCX (Profundezas, poderes paranormais)", DOCX_FONTE),
+                        ("ARQUIVOS SECRETOS (pacotes oficiais)", ARQUIVOS_SECRETOS)]:
         o, t = run_group(det, name, cases)
         total_ok += o
         total += t

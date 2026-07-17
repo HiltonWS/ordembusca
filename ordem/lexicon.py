@@ -47,7 +47,7 @@ CONDICOES = [
     "Enjoado", "Envenenado", "Esmorecido", "Exausto", "Fascinado", "Fraco",
     "Frustrado", "Imóvel", "Inconsciente", "Indefeso", "Lento", "Ofuscado",
     "Paralisado", "Pasmo", "Petrificado", "Sangrando", "Surdo", "Surpreendido",
-    "Vulnerável", "Zonzo", "Enrijecido", "Machucado",
+    "Vulnerável", "Zonzo", "Enrijecido", "Machucado", "Trêmulo",
 ]
 
 # recursos e siglas — incluem formas faladas comuns
@@ -145,10 +145,10 @@ def _looks_like_ritual_name(line: str) -> bool:
 
 _RITUAL_FIELDS = re.compile(
     r"^(Execução|Alcance|Alvo|Área|Area|Duração|Duracao|Resistência|Resistencia)"
-    r"\s*[:\-–—]",
+    r"\b\s*[:\-–—]?\s+\S",
     re.I,
 )
-_RITUAL_DESC = re.compile(r"^Descrição\s*[:\-–—]\s*(.*)", re.I)
+_RITUAL_DESC = re.compile(r"^Descrição\s*[:\-–—]?\s+(.*)", re.I)
 _RITUAL_TIER = re.compile(r"^(Discente|Verdadeiro|Afinidade)\b", re.I)  # upgrades
 
 

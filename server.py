@@ -72,10 +72,12 @@ def _emit_from_thread(event: dict) -> None:
 
 def _audio_worker() -> None:
     """Thread: lê o áudio, roda o pipeline e emite eventos."""
-    from ordem.audio import frames_from_mic, frames_from_wav
+    from ordem.audio import frames_from_devices, frames_from_mic, frames_from_wav
 
     source = _config.get("source")
-    if source == "mic":
+    if source == "devices":
+        frames = frames_from_devices(_config["devices"])
+    elif source == "mic":
         frames = frames_from_mic(_config.get("mic_device"))
     elif source == "wav":
         frames = frames_from_wav(_config["wav"])
@@ -92,7 +94,7 @@ def _audio_worker() -> None:
 async def _startup() -> None:
     global _loop
     _loop = asyncio.get_running_loop()
-    if _config.get("source") in ("mic", "wav"):
+    if _config.get("source") in ("mic", "wav", "devices"):
         threading.Thread(target=_audio_worker, daemon=True).start()
 
 
@@ -131,6 +133,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     src = ap.add_mutually_exclusive_group()
     src.add_argument("--mic", action="store_true")
+    src.add_argument("--devices", type=int, nargs="+", metavar="N",
+                     help="mixar dispositivos (mic + loopback do sistema)")
     src.add_argument("--wav")
     src.add_argument("--demo", action="store_true")
     ap.add_argument("--db", default="ordem.db")
@@ -144,7 +148,9 @@ def main() -> int:
     args = ap.parse_args()
 
     _config.update(
-        source="mic" if args.mic else "wav" if args.wav else "demo",
+        source=("devices" if args.devices else "mic" if args.mic
+                else "wav" if args.wav else "demo"),
+        devices=args.devices,
         wav=args.wav, db=args.db, model=args.model, device=args.device,
         compute=args.compute, mic_device=args.mic_device,
         aggressiveness=args.aggressiveness,

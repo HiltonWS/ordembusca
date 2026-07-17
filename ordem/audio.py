@@ -125,24 +125,127 @@ def _resample_int16(data: np.ndarray, sr_in: int, sr_out: int) -> np.ndarray:
 
 def frames_from_mic(device: int | None = None) -> Iterator[bytes]:
     """Frames de 30ms do microfone (requer sounddevice + PortAudio)."""
-    import queue
+    yield from frames_from_devices([device if device is not None else None])
 
+
+# ---- Captura multi-dispositivo (mic + loopback do sistema) ---------------
+
+def list_input_devices() -> list[dict]:
+    """Dispositivos de entrada disponíveis, marcando prováveis loopbacks.
+
+    Loopback = dispositivo que captura o que VOCÊ ESCUTA (saída do sistema:
+    Discord, vídeos...). No Linux (Pulse/PipeWire) são os '*.monitor';
+    no Windows, 'Stereo Mix' ou cabos virtuais (VB-Cable); no macOS,
+    drivers como BlackHole.
+    """
     import sounddevice as sd
 
-    q: queue.Queue[bytes] = queue.Queue()
+    marks = ("monitor", "loopback", "stereo mix", "mix", "blackhole",
+             "vb-audio", "cable output", "what u hear")
+    out = []
+    for i, d in enumerate(sd.query_devices()):
+        if d["max_input_channels"] > 0:
+            name = d["name"]
+            out.append({
+                "index": i,
+                "name": name,
+                "samplerate": int(d.get("default_samplerate") or SAMPLE_RATE),
+                "loopback": any(m in name.lower() for m in marks),
+            })
+    return out
 
-    def callback(indata, frames, time_info, status):  # noqa: ANN001
-        q.put(bytes(indata))
 
-    with sd.RawInputStream(samplerate=SAMPLE_RATE, blocksize=FRAME_SAMPLES,
-                           dtype="int16", channels=1, callback=callback,
-                           device=device):
-        buf = b""
+def mix_float_blocks(blocks: "list[np.ndarray]") -> bytes:
+    """Soma blocos float32 [-1,1] de mesmo tamanho e converte p/ PCM16.
+
+    Puro e testável: é o coração da mixagem mic+loopback.
+    """
+    if not blocks:
+        return b""
+    mix = np.sum(np.stack(blocks, axis=0), axis=0)
+    mix = np.clip(mix, -1.0, 1.0)
+    return (mix * 32767.0).astype(np.int16).tobytes()
+
+
+class _DeviceReader:
+    """Lê um dispositivo em thread própria e entrega float32 mono 16kHz."""
+
+    def __init__(self, device: int | str | None):
+        import threading
+
+        import sounddevice as sd
+
+        info = sd.query_devices(device, "input")
+        self.native_sr = int(info.get("default_samplerate") or SAMPLE_RATE)
+        self._buf = np.zeros(0, dtype=np.float32)
+        self._lock = threading.Lock()
+        self._cv = threading.Condition(self._lock)
+
+        def callback(indata, frames, time_info, status):  # noqa: ANN001
+            mono = indata.mean(axis=1) if indata.ndim > 1 else indata[:, 0]
+            data = mono.astype(np.float32)
+            if self.native_sr != SAMPLE_RATE:
+                data = _resample_f32(data, self.native_sr, SAMPLE_RATE)
+            with self._cv:
+                self._buf = np.concatenate([self._buf, data])
+                self._cv.notify()
+
+        self.stream = sd.InputStream(
+            device=device, channels=max(1, min(2, info["max_input_channels"])),
+            samplerate=self.native_sr, dtype="float32",
+            blocksize=0, callback=callback,
+        )
+
+    def start(self):
+        self.stream.start()
+
+    def stop(self):
+        self.stream.stop()
+        self.stream.close()
+
+    def pop(self, n: int, wait: bool) -> np.ndarray:
+        """Retira n amostras. wait=True bloqueia até ter; wait=False completa
+        com zeros (dispositivos secundários não devem travar o fluxo)."""
+        with self._cv:
+            if wait:
+                while len(self._buf) < n:
+                    self._cv.wait(timeout=0.5)
+            take = self._buf[:n]
+            self._buf = self._buf[n:]
+        if len(take) < n:
+            take = np.concatenate([take, np.zeros(n - len(take), np.float32)])
+        return take
+
+
+def _resample_f32(data: np.ndarray, sr_in: int, sr_out: int) -> np.ndarray:
+    if sr_in == sr_out or len(data) == 0:
+        return data
+    n_out = int(round(len(data) * sr_out / sr_in))
+    x_old = np.linspace(0, 1, len(data), endpoint=False)
+    x_new = np.linspace(0, 1, n_out, endpoint=False)
+    return np.interp(x_new, x_old, data).astype(np.float32)
+
+
+def frames_from_devices(devices: list) -> Iterator[bytes]:
+    """Frames de 30ms mixando 1+ dispositivos de entrada.
+
+    Uso típico: [índice_do_microfone, índice_do_loopback] para transcrever
+    o que você fala E o que você escuta (os outros jogadores no Discord).
+    O primeiro dispositivo dita o ritmo; os demais entram com o que tiverem
+    (zeros se atrasados), evitando travas por drift de clock.
+    """
+    readers = [_DeviceReader(d) for d in devices]
+    for r in readers:
+        r.start()
+    try:
         while True:
-            buf += q.get()
-            while len(buf) >= FRAME_BYTES:
-                yield buf[:FRAME_BYTES]
-                buf = buf[FRAME_BYTES:]
+            blocks = [readers[0].pop(FRAME_SAMPLES, wait=True)]
+            for r in readers[1:]:
+                blocks.append(r.pop(FRAME_SAMPLES, wait=False))
+            yield mix_float_blocks(blocks)
+    finally:
+        for r in readers:
+            r.stop()
 
 
 def utterances(frames: Iterator[bytes], aggressiveness: int = 2,

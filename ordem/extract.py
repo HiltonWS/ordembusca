@@ -123,10 +123,20 @@ def _normalize_fancy_unicode(s: str) -> str:
 
 def _title_from_filename(path: Path) -> str:
     name = _normalize_fancy_unicode(path.stem)
-    name = name.replace("_", " ").strip()
-    # remove sufixos de versão comuns: "v1 3", "1 3", "-1"
-    name = re.sub(r"\s+v?\d+([ ._]\d+)*(-\d+)?\s*$", "", name).strip()
+    name = name.replace("_", " ").replace("-", " ").strip()
+    # remove sufixos de versão comuns: "v1 2", "1 3", "3 v1 1"
+    name = re.sub(r"(\s+v?\d+([ ._]\d+)*)+\s*$", _keep_pack_number, name).strip()
     return name or path.stem
+
+
+def _keep_pack_number(m: re.Match) -> str:
+    """Preserva número de pacote ("3 v1 1" → "3") mas descarta versão pura
+    ("1 3" → nada): o número só fica se o token seguinte for v<dígito>."""
+    tokens = m.group(0).split()
+    if (len(tokens) >= 2 and tokens[0].isdigit() and len(tokens[0]) <= 2
+            and re.fullmatch(r"v\d+", tokens[1])):
+        return " " + tokens[0]
+    return ""
 
 
 _TITLE_STYLES = {"Title", "Heading 1"}

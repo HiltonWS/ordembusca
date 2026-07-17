@@ -51,8 +51,9 @@ todas funcionais e testadas. Roda inteiramente na sua máquina.
    referência (livro + página, ou fonte + seção).
 
 ### Números da ingestão atual
-- 3 fontes (2 PDF + 1 DOCX) · 922 chunks · **231 termos** de léxico
-- **97 rituais**, 62 poderes, 34 condições, 27 perícias, 6 recursos, 5 atributos
+- 9 fontes (8 PDF — Livro de Regras, Sobrevivendo ao Horror e 6 pacotes de
+  **Arquivos Secretos** — + 1 DOCX homebrew) · 1554 chunks · **238 termos**
+- **103 rituais**, 62 poderes, 35 condições, 27 perícias, 6 recursos, 5 atributos
 
 ---
 
@@ -102,11 +103,30 @@ python query.py --search "exposição paranormal"
 **Ouvir a mesa ao vivo (Fase 2 — voz):**
 
 ```bash
-python listen.py --list-mics             # descobrir o índice do microfone
-python listen.py --mic                    # ouvir o microfone em tempo real
+python listen.py --list-mics             # lista dispositivos; marca [LOOPBACK]
+python listen.py --mic                    # só o seu microfone
+python listen.py --devices 1 5            # microfone + loopback (mesa inteira)
 python listen.py --wav sessao.wav         # testar com uma gravação primeiro
 python listen.py --mic --model medium --device cuda   # modelo maior em GPU
 ```
+
+### Ouvindo o que você fala E o que você escuta
+
+Numa mesa online, metade da conversa sai do seu fone (os outros jogadores
+no Discord) — o microfone sozinho não pega isso. A solução é mixar dois
+dispositivos com `--devices <mic> <loopback>`, onde o *loopback* é um
+dispositivo de entrada que espelha a saída do sistema:
+
+- **Linux (PulseAudio/PipeWire)**: já existe pronto — é o dispositivo
+  `Monitor of ...` que aparece no `--list-mics` marcado como `[LOOPBACK]`.
+- **Windows**: habilite o "Stereo Mix" (Painel de Som → Gravação →
+  dispositivos desativados) ou instale o VB-Cable e aponte a saída do
+  Discord pra ele.
+- **macOS**: instale o BlackHole e crie um Multi-Output Device.
+
+O mixer soma os dois fluxos (com reamostragem e proteção contra clipping)
+antes do VAD, então falas suas e dos outros entram no mesmo pipeline.
+O mesmo vale para o painel web: `python server.py --devices 1 5`.
 
 Na 1ª execução o modelo do Whisper (`small` por padrão) é baixado
 automaticamente e fica em cache — depois roda **offline**. Cada fala é
@@ -210,10 +230,11 @@ python tests/test_detection.py      # runner colorido no terminal
 ```
 
 A suíte cobre: rituais dos 5 elementos oficiais + o homebrew "Profundezas",
-perícias, condições, recursos, poderes (colchetes e Poderes Paranormais),
-robustez a ruído de STT (acentos, erros fonéticos, **palavras partidas** e
-**distorção pesada**), casos negativos difíceis, fontes **.docx** e
-cobertura de todos os 97 rituais (este último só roda se `ordem.db` existir).
+conteúdo dos 6 pacotes de **Arquivos Secretos**, perícias, condições,
+recursos, poderes (colchetes e Poderes Paranormais), a mixagem de áudio
+(mic + loopback), robustez a ruído de STT (acentos, erros fonéticos,
+**palavras partidas** e **distorção pesada**), casos negativos difíceis e
+cobertura de todos os 103 rituais (este último só roda se `ordem.db` existir).
 
 **CI**: o workflow em `.github/workflows/ci.yml` roda pytest (Python 3.11 e
 3.12) e ruff a cada push/PR. Como os livros não são versionados, os testes
