@@ -1,10 +1,21 @@
 # Ordem Paranormal — Detector de Mecânicas em Tempo Real
 
-![CI](https://github.com/SEU_USUARIO/ordem-mecanicas/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/HiltonWS/ordembusca/actions/workflows/ci.yml/badge.svg)
 
 Sistema **100% local** que, a partir dos livros e PDFs de Ordem Paranormal,
 reconhece na fala da mesa *quais mecânicas estão sendo usadas* (perícias,
 rituais, condições, recursos) e mostra a regra e a página de referência.
+
+![Painel ao vivo — mecânicas oficiais](docs/screenshot-oficial.png)
+*Painel "Ordo Realitas": transcrição à esquerda, cards de mecânica à direita
+— ritual com elemento/círculo, perícia, condição, recursos, cada um com o
+resumo da regra e a referência de livro/página.*
+
+![Painel ao vivo — conteúdo homebrew](docs/screenshot-homebrew.png)
+*Conteúdo homebrew de um `.docx` de campanha: ritual do elemento customizado
+**Profundezas** (Abyssum Gate), Poder Paranormal (Antecipar) e poder de ficha
+(Saber é Poder) — incluindo detecção com fala distorcida ("konjura sopro do
+ca os" → Sopro do Caos).*
 
 > **Aviso legal:** este repositório contém apenas **código**. Os livros de
 > Ordem Paranormal são material com direitos autorais e **não são (nem devem

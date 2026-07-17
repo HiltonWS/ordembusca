@@ -6,11 +6,13 @@ Cada fala transcrita gera um Event com o texto e as mecânicas detectadas.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Iterator
+from typing import TYPE_CHECKING, Iterator
 
-from . import audio as audiomod
 from . import db as dbmod
 from .detect import Detection, Detector
+
+if TYPE_CHECKING:  # só para tipagem; runtime importa sob demanda
+    pass
 
 
 @dataclass
@@ -40,12 +42,24 @@ class Pipeline:
                  device: str = "cpu", compute_type: str = "int8"):
         self.conn = dbmod.connect(db_path)
         self.detector = Detector(dbmod.all_lexicon(self.conn))
-        from .stt import Transcriber
-        # o modelo em si só é baixado/carregado na 1ª transcrição
-        self.transcriber = Transcriber(model_size, device, compute_type)
+        # STT é opcional: sem as deps de voz instaladas, detect_text e o
+        # modo demo/web continuam funcionando; só o run() com áudio exige.
+        self._stt_args = (model_size, device, compute_type)
+        self._transcriber = None
+
+    @property
+    def transcriber(self):
+        if self._transcriber is None:
+            from .stt import Transcriber
+            self._transcriber = Transcriber(*self._stt_args)
+        return self._transcriber
 
     def run(self, frames: Iterator[bytes], aggressiveness: int = 2,
             padding_ms: int = 400) -> Iterator[Event]:
+        # import sob demanda: as deps de voz (webrtcvad etc.) só são
+        # necessárias quando há áudio de verdade — o modo demo/web e o
+        # detect_text funcionam sem elas instaladas.
+        from . import audio as audiomod
         for utt in audiomod.utterances(frames, aggressiveness, padding_ms):
             text = self.transcriber.transcribe(utt.audio)
             if not text:
