@@ -51,13 +51,19 @@ todas funcionais e testadas. Roda inteiramente na sua máquina.
 pip install -r requirements.txt
 ```
 
+> **Nota sobre o banco (`ordem.db`)**: ele é derivado dos livros e **não é
+> versionado** no Git (os PDFs/DOCX têm direitos autorais). Ao clonar o
+> repositório, gere o seu banco localmente com `python ingest.py` apontando
+> para os seus arquivos — veja abaixo. O `.gitignore` já exclui livros
+> (`*.pdf`, `*.docx`) e o banco (`*.db`).
+
 ## Uso
 
 **Ingerir fontes** (aceita arquivos ou pastas; rode de novo para adicionar mais):
 
 ```bash
-python ingest.py "Livro_de_Regras.pdf" "Sobrevivendo_ao_Horror.pdf" homebrew.txt
-python ingest.py minha_pasta_de_livros/        # ingere tudo da pasta
+python ingest.py "Livro_de_Regras.pdf" "Sobrevivendo_ao_Horror.pdf" homebrew.docx
+python ingest.py minha_pasta_de_livros/        # ingere tudo da pasta (pdf/txt/docx)
 python ingest.py --force livro.pdf              # reprocessa uma fonte
 ```
 
