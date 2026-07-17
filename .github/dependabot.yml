@@ -1,0 +1,18 @@
+version: 2
+updates:
+  # Mantém as GitHub Actions dos workflows atualizadas
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [dependencies]
+
+  # Mantém as dependências Python (requirements.txt / pyproject) atualizadas
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [dependencies]
+    groups:
+      python-deps:
+        patterns: ["*"]
