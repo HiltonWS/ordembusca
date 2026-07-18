@@ -85,7 +85,8 @@ def _audio_worker() -> None:
         return  # demo: sem áudio
 
     pipe = get_pipeline()
-    for ev in pipe.run(frames, aggressiveness=_config.get("aggressiveness", 2)):
+    for ev in pipe.run(frames, aggressiveness=_config.get("aggressiveness", 2),
+                       padding_ms=_config.get("padding_ms", 550)):
         _emit_from_thread({"type": "event", **ev.to_json()})
     _emit_from_thread({"type": "end"})
 
@@ -143,6 +144,8 @@ def main() -> int:
     ap.add_argument("--compute", default="int8")
     ap.add_argument("--mic-device", type=int, default=None)
     ap.add_argument("--aggressiveness", type=int, default=2)
+    ap.add_argument("--padding-ms", type=int, default=550,
+                    help="silêncio (ms) para fechar uma fala; maior = falas mais completas")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8000)
     args = ap.parse_args()
@@ -153,7 +156,7 @@ def main() -> int:
         devices=args.devices,
         wav=args.wav, db=args.db, model=args.model, device=args.device,
         compute=args.compute, mic_device=args.mic_device,
-        aggressiveness=args.aggressiveness,
+        aggressiveness=args.aggressiveness, padding_ms=args.padding_ms,
     )
 
     import uvicorn

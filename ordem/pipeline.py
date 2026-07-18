@@ -41,21 +41,28 @@ class Pipeline:
     def __init__(self, db_path: str = "ordem.db", model_size: str = "small",
                  device: str = "cpu", compute_type: str = "int8"):
         self.conn = dbmod.connect(db_path)
-        self.detector = Detector(dbmod.all_lexicon(self.conn))
-        # STT é opcional: sem as deps de voz instaladas, detect_text e o
-        # modo demo/web continuam funcionando; só o run() com áudio exige.
+        lexicon = dbmod.all_lexicon(self.conn)
+        self.detector = Detector(lexicon)
+        # vocabulário para o viés do Whisper: nomes próprios primeiro
+        # (rituais/poderes, que o STT mais erra), depois o resto do sistema
+        prio = {"ritual": 0, "poder": 1, "pericia": 2, "condicao": 3,
+                "recurso": 4, "atributo": 5}
+        vocab = [e["term"] for e in sorted(
+            lexicon, key=lambda e: prio.get(e["category"], 9))]
         self._stt_args = (model_size, device, compute_type)
+        self._vocab = vocab
         self._transcriber = None
 
     @property
     def transcriber(self):
         if self._transcriber is None:
             from .stt import Transcriber
-            self._transcriber = Transcriber(*self._stt_args)
+            self._transcriber = Transcriber(*self._stt_args,
+                                            vocabulary=self._vocab)
         return self._transcriber
 
     def run(self, frames: Iterator[bytes], aggressiveness: int = 2,
-            padding_ms: int = 400) -> Iterator[Event]:
+            padding_ms: int = 550) -> Iterator[Event]:
         # import sob demanda: as deps de voz (webrtcvad etc.) só são
         # necessárias quando há áudio de verdade — o modo demo/web e o
         # detect_text funcionam sem elas instaladas.

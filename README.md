@@ -128,6 +128,31 @@ O mixer soma os dois fluxos (com reamostragem e proteção contra clipping)
 antes do VAD, então falas suas e dos outros entram no mesmo pipeline.
 O mesmo vale para o painel web: `python server.py --devices 1 5`.
 
+### Melhorando a qualidade da transcrição
+
+O sistema já aplica três melhorias automáticas: **viés de vocabulário**
+(o léxico do banco — rituais, perícias, NEX... — é injetado no Whisper via
+`initial_prompt`/`hotwords`, então ele passa a reconhecer os termos do
+jogo), **normalização de volume** por fala (áudio fraco do mix é
+amplificado antes de transcrever) e **folga de silêncio maior** no VAD
+(padrão 550 ms, falas menos picotadas).
+
+Se ainda houver muitos erros, nesta ordem de impacto:
+
+1. **Modelo maior** — `small` (padrão) erra bem mais que `medium`:
+   `python listen.py --devices 1 5 --model medium` (CPU aguenta, mais
+   lento) ou, com GPU NVIDIA, `--model large-v3 --device cuda --compute
+   float16` (melhor qualidade possível).
+2. **Falas cortadas no meio** → aumente a folga: `--padding-ms 800`.
+3. **Ruído de fundo disparando o VAD** → `--aggressiveness 3`; o inverso
+   (falas engolidas) → `--aggressiveness 1`.
+4. **Volume do loopback** muito acima da sua voz (ou vice-versa) → ajuste
+   o volume relativo no sistema; o mix respeita os níveis de cada fonte.
+
+Lembre que o detector tolera transcrição imperfeita (fuzzy + fonética),
+então mesmo com texto meio errado as mecânicas costumam ser reconhecidas —
+o modelo maior melhora principalmente a *leitura* da transcrição.
+
 Na 1ª execução o modelo do Whisper (`small` por padrão) é baixado
 automaticamente e fica em cache — depois roda **offline**. Cada fala é
 segmentada por VAD, transcrita e analisada; as mecânicas aparecem no

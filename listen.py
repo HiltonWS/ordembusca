@@ -53,6 +53,9 @@ def main() -> int:
                     help="índice do microfone (ver --list-mics)")
     ap.add_argument("--aggressiveness", type=int, default=2,
                     help="VAD 0-3 (maior corta mais ruído)")
+    ap.add_argument("--padding-ms", type=int, default=550,
+                    help="silêncio (ms) para fechar uma fala; "
+                         "maior = falas mais completas")
     ap.add_argument("--list-mics", action="store_true")
     args = ap.parse_args()
 
@@ -85,7 +88,8 @@ def main() -> int:
     else:
         frames = frames_from_wav(args.wav)
     try:
-        for ev in pipe.run(frames, aggressiveness=args.aggressiveness):
+        for ev in pipe.run(frames, aggressiveness=args.aggressiveness,
+                           padding_ms=args.padding_ms):
             print_event(ev)
     except KeyboardInterrupt:
         print("\nEncerrado.", file=sys.stderr)
