@@ -150,6 +150,59 @@ _RITUAL_FIELDS = re.compile(
 )
 _RITUAL_DESC = re.compile(r"^Descrição\s*[:\-–—]?\s+(.*)", re.I)
 _RITUAL_TIER = re.compile(r"^(Discente|Verdadeiro|Afinidade)\b", re.I)  # upgrades
+# linha completa de aprimoramento: "Discente (+2 PE): texto" | "Afinidade: texto"
+_TIER_LINE = re.compile(
+    r"^(Discente|Verdadeiro|Afinidade)\s*(\([^)]*\))?\s*[:\-–—]?\s*(.*)", re.I
+)
+
+
+def _extract_tiers(lines: list[str], header_idx: int) -> dict[str, str]:
+    """Captura os aprimoramentos do bloco (Discente/Verdadeiro/Afinidade).
+
+    Devolve {'discente': '(+2 PE) muda o alcance...', 'verdadeiro': ...}.
+    A varredura para no próximo bloco (cabeçalho elemento+círculo) e cada
+    texto de aprimoramento termina em linha vazia, novo aprimoramento ou
+    quando a linha seguinte é um cabeçalho (a atual seria o nome do
+    próximo ritual).
+    """
+    tiers: dict[str, list[str]] = {}
+    current: str | None = None
+    window = lines[header_idx + 1: header_idx + 60]
+    for j, line in enumerate(window):
+        s = line.strip()
+        if _RITUAL_HEADER.match(line) or _PODER_PARANORMAL.match(line):
+            break                      # começou o próximo bloco
+        if (j + 1 < len(window)
+                and (_RITUAL_HEADER.match(window[j + 1])
+                     or _PODER_PARANORMAL.match(window[j + 1]))
+                and _looks_like_ritual_name(s)):
+            break                      # esta linha é o nome do próximo bloco
+        if s.isdigit():
+            continue                   # número de página no rodapé
+        if len(s) > 3 and s.isupper():
+            current = None             # rótulo/cabeçalho: fecha o texto
+            continue                   # atual, mas segue procurando tiers
+        m = _TIER_LINE.match(s)
+        if m and _RITUAL_TIER.match(s):
+            key = m.group(1).lower()
+            if key in tiers:
+                break                  # repetiu: já é o bloco seguinte
+            cost = (m.group(2) or "").strip()
+            rest = m.group(3).strip()
+            tiers[key] = [f"{cost} {rest}".strip() if cost else rest]
+            current = key
+            continue
+        if not s:
+            current = None
+            continue
+        if current:
+            tiers[current].append(s)
+    out: dict[str, str] = {}
+    for key, parts in tiers.items():
+        text = re.sub(r"\s+", " ", " ".join(parts)).strip()
+        if text:
+            out[key] = _trim(text, 300)
+    return out
 
 
 def _ritual_summary(lines: list[str], header_idx: int) -> str | None:
@@ -232,10 +285,12 @@ def extract_rituais(source: Source) -> list[LexEntry]:
             if key in seen:
                 continue
             seen.add(key)
+            meta = {"elemento": elemento.capitalize(), "circulo": circulo}
+            meta.update(_extract_tiers(lines, i))
             entries.append(LexEntry(
                 term=name,
                 category=category,
-                meta={"elemento": elemento.capitalize(), "circulo": circulo},
+                meta=meta,
                 summary=_ritual_summary(lines, i),
                 source_filename=source.filename,
                 page=page.number,
@@ -336,9 +391,65 @@ def canonical_entries(source: Source | None = None) -> list[LexEntry]:
     return out
 
 
+# rótulo dos Poderes Paranormais nos Arquivos Secretos: "PODER PARANORMAL MORTE"
+_PODER_PARANORMAL = re.compile(
+    r"^\s*PODER\s+PARANORMAL\s+(" + "|".join(ELEMENTOS) + r")\s*$", re.I
+)
+
+
+def extract_poderes_paranormais(source: Source) -> list[LexEntry]:
+    """Poderes Paranormais no formato dos Arquivos Secretos:
+    <Nome>\\n PODER PARANORMAL <ELEMENTO> (sem círculo)."""
+    entries: list[LexEntry] = []
+    seen: set[str] = set()
+    for page in source.pages:
+        lines = page.text.split("\n")
+        for i, line in enumerate(lines):
+            m = _PODER_PARANORMAL.match(line)
+            if not m:
+                continue
+            name = None
+            for j in range(i - 1, max(-1, i - 3), -1):
+                cand = lines[j].strip()
+                if not cand:
+                    continue
+                if _looks_like_ritual_name(cand):
+                    name = cand
+                break
+            if not name:
+                continue
+            key = normalize_term(name)
+            if key in seen:
+                continue
+            seen.add(key)
+            meta = {"elemento": m.group(1).capitalize()}
+            meta.update(_extract_tiers(lines, i))
+            # resumo: linhas após o rótulo até vazio/próximo bloco/tier
+            desc: list[str] = []
+            for nxt in lines[i + 1: i + 14]:
+                s = nxt.strip()
+                if (not s or _PODER_PARANORMAL.match(nxt)
+                        or _RITUAL_TIER.match(s)):
+                    break
+                if s.isdigit():
+                    continue
+                if len(s) > 3 and s.isupper():
+                    break
+                desc.append(s)
+            summary = _trim(re.sub(r"\s+", " ", " ".join(desc)).strip(), 300) \
+                if desc else None
+            entries.append(LexEntry(
+                term=name, category="poder", meta=meta, summary=summary,
+                source_filename=source.filename, page=page.number,
+                loc=page.loc,
+            ))
+    return entries
+
+
 def build_lexicon(source: Source) -> list[LexEntry]:
     """Léxico completo para uma fonte: rituais + poderes + termos canônicos."""
     return (extract_rituais(source) + extract_poderes(source)
+            + extract_poderes_paranormais(source)
             + canonical_entries(source))
 
 

@@ -26,13 +26,19 @@ def print_event(ev) -> None:
     print(f"\n{ts} 🎙  {ev.text}")
     for d in ev.detections:
         cor = CORES.get(d["category"], "")
-        extra = f" [{d['elemento']} {d['circulo']}]" if d.get("elemento") else ""
+        if d.get("elemento"):
+            circ = d.get("circulo")
+            extra = f" [{d['elemento']}{f' {circ}' if circ else ''}]"
+        else:
+            extra = ""
         loc = d.get("loc") or (f"p.{d['page']}" if d.get("page") else None)
         ref = f" — {d['source']} · {loc}" if d.get("source") and loc else ""
         print(f"       {cor}● {d['category']:9s}{RESET} {d['term']}{extra}"
               f"  ({d['score']}%){ref}")
         if d.get("summary"):
             print(f"         ↳ {d['summary']}")
+        if d.get("tier"):
+            print(f"         ★ {d['tier']}: {d['tier_summary']}")
 
 
 def main() -> int:

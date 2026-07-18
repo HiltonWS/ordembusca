@@ -154,7 +154,39 @@ ARQUIVOS_SECRETOS = [
     ("ela conjura Labirinto Mental no cultista", {"Labirinto Mental"}),
     ("usa Mapa Sanguíneo pra rastrear o alvo", {"Mapa Sanguíneo"}),
     ("o personagem fica trêmulo de pânico", {"Trêmulo"}),
+    ("ativo Grilhões de Lodo no corredor", {"Grilhões de Lodo"}),
+    ("uso Escudo Espiral Temporal na munição", {"Escudo Espiral Temporal"}),
 ]
+
+# combos falados: ritual/poder + versão (Discente/Verdadeiro/Afinidade)
+# formato: (frase, termo esperado, tier esperado)
+COMBOS_TIER = [
+    ("conjura Eletrocussão Verdadeira no grupo", "Eletrocussão", "Verdadeiro"),
+    ("uso Hesitação Forçada Discente no capanga", "Hesitação Forçada", "Discente"),
+    ("ativo Grilhões de Lodo com afinidade", "Grilhões de Lodo", "Afinidade"),
+    ("lança Tecer Ilusão no verdadeiro", "Tecer Ilusão", "Verdadeiro"),
+    ("conjura Eletrocussão simples", "Eletrocussão", None),   # sem tier
+]
+
+
+def run_combos(det: Detector) -> tuple[int, int]:
+    print("\nCOMBOS DE VERSÃO (Discente/Verdadeiro/Afinidade)")
+    ok = 0
+    for text, term, tier in COMBOS_TIER:
+        found = {d.term: d for d in det.detect(text)}
+        d = found.get(term)
+        got = d.tier if d else "(não detectado)"
+        passed = d is not None and d.tier == tier and \
+            (tier is None or bool(d.tier_summary))
+        if passed:
+            ok += 1
+            label = tier or "sem versão"
+            print(f"  {GREEN}✓{RESET} {text[:46]:46s} → {term} [{label}]")
+        else:
+            print(f"  {RED}✗{RESET} {text[:46]:46s} "
+                  f"{RED}esperado tier={tier}, obtido={got}{RESET}")
+    print(f"  → {ok}/{len(COMBOS_TIER)}")
+    return ok, len(COMBOS_TIER)
 
 
 def run_group(det: Detector, name: str, cases: list) -> tuple[int, int]:
@@ -241,6 +273,9 @@ def main() -> int:
         print(f"  → {o}/{len(group)}")
         total_ok += o
         total += len(group)
+    o, t = run_combos(det)
+    total_ok += o
+    total += t
     o, t = run_cobertura_rituais(det, conn)
     total_ok += o
     total += t

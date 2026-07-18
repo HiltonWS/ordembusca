@@ -82,6 +82,11 @@
     padding:2px 7px;border-radius:2px;letter-spacing:.08em;
     background:var(--accent,#555);color:#0a0908;text-transform:uppercase}
   .card p.sum{margin:9px 0 0;font-size:13.5px;line-height:1.5;color:#cfc9bc}
+  .card .tier{margin:9px 0 0;padding:8px 10px;border-radius:2px;
+    background:rgba(255,255,255,.04);border:1px dashed var(--accent,#555);
+    font-size:13px;line-height:1.5;color:#dcd6c8}
+  .card .tier b{font-family:'Oswald',sans-serif;text-transform:uppercase;
+    letter-spacing:.12em;font-size:11px;color:var(--accent,#999)}
   .card .ref{margin-top:9px;font-family:'JetBrains Mono',monospace;font-size:10.5px;
     color:var(--muted);letter-spacing:.05em;display:flex;gap:12px;flex-wrap:wrap}
   .card .ref b{color:#b5ac9c;font-weight:500}
@@ -168,7 +173,7 @@ function addLine(ev){
 function addCard(d){
   document.getElementById('cards-empty')?.remove();
   // agrupa se o mesmo termo apareceu entre os 4 cards mais recentes
-  const key=d.term+'|'+d.category;
+  const key=d.term+'|'+d.category+'|'+(d.tier||'');
   const existing=recent.slice(0,4).find(r=>r.key===key);
   if(existing){
     existing.n++; existing.node.querySelector('.count').textContent='×'+existing.n;
@@ -177,12 +182,16 @@ function addCard(d){
   const accent=accentFor(d);
   const el=document.createElement('div');
   el.className='card'; el.style.setProperty('--accent',accent);
-  const circ=d.elemento?` · ${CIRC[d.circulo]||d.circulo} círculo`:'';
+  const circ=(d.elemento&&d.circulo)?` · ${CIRC[d.circulo]||d.circulo} círculo`:'';
   const eyebrow=d.elemento
-     ? `${d.elemento}${circ}<span class="cat">/ ritual</span>`
+     ? `${d.elemento}${circ}<span class="cat">/ ${CATLABEL[d.category]||d.category}</span>`
      : `${CATLABEL[d.category]||d.category}`;
   const badge=d.elemento
-     ? `<span class="badge">${d.elemento} ${d.circulo}</span>` : '';
+     ? `<span class="badge">${d.elemento}${d.circulo?` ${d.circulo}`:''}</span>` : '';
+  const tierBadge=d.tier?`<span class="badge">★ ${escapeHtml(d.tier)}</span>`:'';
+  const tierBlock=d.tier
+     ? `<div class="tier"><b>★ ${escapeHtml(d.tier)}</b> ${escapeHtml(d.tier_summary||'')}</div>`
+     : '';
   const ref=[
      d.source?`<b>${escapeHtml(d.source)}</b>`:'',
      d.loc ? escapeHtml(d.loc) : (d.page?`p.${d.page}`:''),
@@ -191,8 +200,9 @@ function addCard(d){
   el.innerHTML=`
      <div class="count"></div>
      <div class="eyebrow">${eyebrow}</div>
-     <h3>${escapeHtml(d.term)} ${badge}</h3>
+     <h3>${escapeHtml(d.term)} ${badge} ${tierBadge}</h3>
      ${d.summary?`<p class="sum">${escapeHtml(d.summary)}</p>`:''}
+     ${tierBlock}
      <div class="ref">${ref}</div>`;
   cards.prepend(el);
   recent.unshift({key,n:1,node:el});

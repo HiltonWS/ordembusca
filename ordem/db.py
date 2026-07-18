@@ -127,7 +127,9 @@ def ingest_source(conn: sqlite3.Connection, source: Source,
                 "ON CONFLICT(norm,category) DO UPDATE SET "
                 "page=CASE WHEN lexicon.page IS NULL THEN excluded.page ELSE lexicon.page END, "
                 "loc=CASE WHEN lexicon.page IS NULL THEN excluded.loc ELSE lexicon.loc END, "
-                "summary=COALESCE(excluded.summary, lexicon.summary)",
+                "summary=COALESCE(excluded.summary, lexicon.summary), "
+                "meta=CASE WHEN LENGTH(excluded.meta) > LENGTH(lexicon.meta) "
+                "THEN excluded.meta ELSE lexicon.meta END",
                 (e.term, normalize_term(e.term), e.category,
                  json.dumps(e.aliases, ensure_ascii=False),
                  json.dumps(e.meta, ensure_ascii=False),

@@ -241,10 +241,20 @@ O núcleo (ingestão + `Detector`) e a voz já estão prontos. Falta plugar:
 Cada mecânica detectada traz um resumo curto da regra:
 - **Rituais**: Execução/Alcance/Duração + as primeiras frases do efeito,
   extraídos direto do livro.
+- **Versões e combos (Discente / Verdadeiro / Afinidade)**: os
+  aprimoramentos de cada ritual/poder são extraídos junto com o bloco.
+  Quando a versão é **falada na mesa** — "conjura *Eletrocussão
+  Verdadeira*", "*Hesitação Forçada Discente*", "*Grilhões de Lodo com
+  afinidade*" — o card mostra, além da regra base, o texto e o custo da
+  versão usada (badge ★ no painel). 113 entradas do léxico têm
+  aprimoramentos capturados.
 - **Condições**: descrição do apêndice de condições.
 - **Poderes** (homebrew): extraídos de fichas/documentos no formato
-  `[Nome do Poder] - descrição`.
+  `[Nome do Poder] - descrição`; **Poderes Paranormais** também no formato
+  dos Arquivos Secretos (`Nome` + `PODER PARANORMAL <ELEMENTO>`).
 - **Perícias, recursos, atributos**: resumo curado, estável.
+
+![Cards com versões faladas](docs/screenshot-versoes.png)
 
 ## Testes
 Duas formas de rodar:

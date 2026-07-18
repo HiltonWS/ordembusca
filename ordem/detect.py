@@ -69,6 +69,8 @@ class Detection:
     loc: str | None
     source: str | None
     matched_text: str
+    tier: str | None = None            # 'Discente'|'Verdadeiro'|'Afinidade'
+    tier_summary: str | None = None    # texto do aprimoramento falado
 
 
 def format_ref(d: Detection) -> str:
@@ -156,7 +158,37 @@ class Detector:
 
         results = sorted(found.values(), key=lambda d: -d.score)
         results = self._gate_ambiguous(results, tokens)
-        return self._suppress_substrings(results)
+        results = self._suppress_substrings(results)
+        return self._attach_tiers(results, tokens)
+
+    # palavras faladas -> chave do aprimoramento no meta
+    _TIER_WORDS = {
+        "discente": "discente",
+        "verdadeiro": "verdadeiro", "verdadeira": "verdadeiro",
+        "afinidade": "afinidade",
+    }
+
+    @classmethod
+    def _attach_tiers(cls, dets: list[Detection],
+                      tokens: list[str]) -> list[Detection]:
+        """Reconhece o combo falado 'Ritual + Discente/Verdadeiro/Afinidade'.
+
+        Ex.: 'conjuro Eletrocussão Verdadeira' → anexa o texto da versão
+        Verdadeiro ao card. O tier só é anexado a rituais/poderes que
+        possuem aquele aprimoramento extraído dos livros.
+        """
+        spoken = {cls._TIER_WORDS[t] for t in tokens if t in cls._TIER_WORDS}
+        if not spoken:
+            return dets
+        for d in dets:
+            if d.category not in ("ritual", "poder"):
+                continue
+            for key in ("verdadeiro", "discente", "afinidade"):
+                if key in spoken and d.meta.get(key):
+                    d.tier = key.capitalize()
+                    d.tier_summary = d.meta[key]
+                    break
+        return dets
 
     @staticmethod
     def _gate_ambiguous(dets: list[Detection], tokens: list[str]) -> list[Detection]:

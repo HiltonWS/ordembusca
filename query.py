@@ -39,11 +39,17 @@ def main() -> int:
 
     print(f'Fala: "{args.texto}"\n')
     for d in detections:
-        extra = f" [{d.meta['elemento']} {d.meta['circulo']}]" if d.meta.get("elemento") else ""
+        if d.meta.get("elemento"):
+            circ = d.meta.get("circulo")
+            extra = f" [{d.meta['elemento']}{f' {circ}' if circ else ''}]"
+        else:
+            extra = ""
         ref = f" — {format_ref(d)}" if d.source else ""
         print(f"● {d.category.upper():9s} {d.term}{extra}  ({d.score}%){ref}")
         if d.summary:
             print(f"    ↳ {d.summary}")
+        if d.tier:
+            print(f"    ★ {d.tier}: {d.tier_summary}")
         print()
     return 0
 
