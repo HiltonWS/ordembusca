@@ -118,11 +118,53 @@ def _clean_page_text(raw: str) -> str:
     return text.strip()
 
 
+def _page_text_columns(page) -> str:
+    """Texto da página respeitando o layout em colunas.
+
+    O `get_text('text')` pode intercalar as colunas, fazendo um bloco de
+    regra "continuar" com texto do outro lado da página. Aqui os blocos
+    de largura total (títulos de seção) dividem a página em faixas
+    verticais; dentro de cada faixa, a coluna esquerda sai inteira antes
+    da direita. Números de página soltos são descartados.
+    """
+    blocks = [b for b in page.get_text("blocks") if b[6] == 0]
+    if not blocks:
+        return ""
+    W = page.rect.width
+    mid = W / 2
+
+    full, left, right = [], [], []
+    for b in blocks:
+        x0, y0, x1, _y1, txt = b[0], b[1], b[2], b[3], b[4]
+        if txt.strip().isdigit() and len(txt.strip()) <= 3:
+            continue                       # número de página no rodapé
+        if x0 < mid * 0.8 and x1 > mid * 1.2:
+            full.append((y0, txt))
+        elif (x0 + x1) / 2 <= mid:
+            left.append((y0, txt))
+        else:
+            right.append((y0, txt))
+
+    full.sort(key=lambda t: t[0])
+    left.sort(key=lambda t: t[0])
+    right.sort(key=lambda t: t[0])
+
+    out: list[str] = []
+    prev_y = float("-inf")
+    for fy, ftxt in full + [(float("inf"), None)]:
+        out += [t for y, t in left if prev_y <= y < fy]
+        out += [t for y, t in right if prev_y <= y < fy]
+        if ftxt is not None:
+            out.append(ftxt)
+        prev_y = fy
+    return "".join(out)
+
+
 def load_pdf(path: Path) -> Source:
     doc = fitz.open(path)
     pages: list[Page] = []
     for i, page in enumerate(doc):
-        raw = page.get_text("text")
+        raw = _page_text_columns(page)
         cleaned = _clean_page_text(raw)
         if cleaned:  # descarta páginas vazias (só arte)
             pages.append(Page(number=i + 1, text=cleaned))
