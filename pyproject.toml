@@ -39,4 +39,4 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_detector.py", "test_audio_mix.py", "test_stt_quality.py"]
+python_files = ["test_detector.py", "test_audio_mix.py", "test_stt_quality.py", "test_dice_glyphs.py"]

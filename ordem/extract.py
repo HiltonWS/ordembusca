@@ -68,6 +68,33 @@ def _clean_line(line: str) -> str | None:
     return line
 
 
+# --- Glifo do d20 -----------------------------------------------------------
+# Nos PDFs, o ícone do dado d20 é uma fonte especial que a extração converte
+# na letra "O": "Teste 2O+5" = 2d20+5, "Fortitude O" = d20, "–OO" = –2d20.
+# A correção é contextual para nunca tocar no artigo "O" do português.
+_DICE_KEYWORDS = (
+    r"Fortitude|Reflexos|Vontade|Percepção|Percepcao|Iniciativa|Teste"
+)
+_DICE_AFTER_DIGIT = re.compile(r"(\d)O(?=[+\-\s,.|)/]|$)")
+_DICE_BEFORE_PLUS = re.compile(r"(?<![\wÀ-ú])(O{1,3})(?=\+\d)")
+_DICE_AFTER_DASH = re.compile(r"([–\-])\s?(O{1,3})(?![\wÀ-ú])")
+_DICE_AFTER_KEYWORD = re.compile(
+    r"\b(" + _DICE_KEYWORDS + r")(\s+)O(?![\wÀ-ú+])"
+)
+
+
+def fix_dice_glyphs(text: str) -> str:
+    """Restaura a notação de dados: 2O+5 → 2d20+5, –OO → –2d20, etc."""
+    text = _DICE_AFTER_DIGIT.sub(r"\1d20", text)
+    text = _DICE_BEFORE_PLUS.sub(
+        lambda m: ("" if len(m.group(1)) == 1 else str(len(m.group(1)))) + "d20",
+        text)
+    text = _DICE_AFTER_DASH.sub(
+        lambda m: m.group(1) + f"{len(m.group(2))}d20", text)
+    text = _DICE_AFTER_KEYWORD.sub(r"\1\g<2>d20", text)
+    return text
+
+
 # Hífen de quebra de linha: "prote-\nge" -> "protege"
 _HYPHEN_BREAK = re.compile(r"(\w)[\u00ad\-]\n(\w)")
 # Caractere soft-hyphen solto
@@ -84,6 +111,7 @@ def _clean_page_text(raw: str) -> str:
     # junta palavras quebradas por hífen no fim da linha
     text = _HYPHEN_BREAK.sub(r"\1\2", text)
     text = _SOFT_HYPHEN.sub("", text)
+    text = fix_dice_glyphs(text)
     # normaliza espaços múltiplos preservando quebras de linha
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
