@@ -1,10 +1,14 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "ordem-mecanicas"
 version = "1.0.0"
 description = "Detector de mecânicas de Ordem Paranormal em tempo real: voz → transcrição local → mecânicas na tela, com referência aos livros"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = "MIT"
 dependencies = [
     "PyMuPDF>=1.24",
     "rapidfuzz>=3.0",
@@ -27,6 +31,7 @@ web = [
 dev = [
     "pytest>=8.0",
     "ruff>=0.4",
+    "build>=1.2",
 ]
 
 [tool.ruff]
@@ -40,3 +45,6 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_detector.py", "test_audio_mix.py", "test_stt_quality.py", "test_dice_glyphs.py", "test_columns.py"]
+
+[tool.setuptools]
+packages = ["ordem"]

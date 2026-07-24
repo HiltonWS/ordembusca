@@ -128,7 +128,7 @@
     </section>
     <section class="col">
       <div class="col-head">Mecânicas em Uso</div>
-      <div class="scroll">
+      <div class="scroll" id="cards-scroll">
         <div class="cards" id="cards">
           <div class="empty" id="cards-empty">
             Nenhuma mecânica ainda. Fale (ou digite abaixo) algo como
@@ -154,7 +154,13 @@ const CATLABEL = {ritual:'ritual',pericia:'perícia',condicao:'condição',
                   recurso:'recurso',atributo:'atributo',poder:'poder'};
 const cards = document.getElementById('cards');
 const feed  = document.getElementById('feed');
+const cardsScroll = document.getElementById('cards-scroll');
 const recent = [];  // termos recentes p/ agrupar repetições
+
+function autoscrollToBottom(el){
+  if(!el) return;
+  requestAnimationFrame(()=>{ el.scrollTop = el.scrollHeight; });
+}
 
 function accentFor(d){
   if(d.elemento && ELEM[d.elemento]) return `var(${ELEM[d.elemento]})`;
@@ -168,7 +174,7 @@ function addLine(ev){
   el.className='line new';
   el.innerHTML=`<span class="ts">${ts}</span>${escapeHtml(ev.text)}`;
   feed.appendChild(el);
-  feed.parentElement.scrollTop=feed.parentElement.scrollHeight;
+  autoscrollToBottom(feed);
 }
 function addCard(d){
   document.getElementById('cards-empty')?.remove();
@@ -177,6 +183,7 @@ function addCard(d){
   const existing=recent.slice(0,4).find(r=>r.key===key);
   if(existing){
     existing.n++; existing.node.querySelector('.count').textContent='×'+existing.n;
+    autoscrollToBottom(cardsScroll);
     return;
   }
   const accent=accentFor(d);
@@ -204,9 +211,10 @@ function addCard(d){
      ${d.summary?`<p class="sum">${escapeHtml(d.summary)}</p>`:''}
      ${tierBlock}
      <div class="ref">${ref}</div>`;
-  cards.prepend(el);
+  cards.appendChild(el);
   recent.unshift({key,n:1,node:el});
   while(cards.children.length>60) cards.lastChild.remove();
+  autoscrollToBottom(cardsScroll);
 }
 function escapeHtml(s){return (s||'').replace(/[&<>"]/g,c=>(
   {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}

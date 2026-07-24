@@ -18,3 +18,4 @@ pydantic>=2.0
 # Dev/testes
 pytest>=8.0
 ruff>=0.5
+build>=1.2
