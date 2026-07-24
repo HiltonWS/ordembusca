@@ -36,13 +36,31 @@ def _detection_to_dict(d: Detection) -> dict:
     }
 
 
+def _canonical_fallback() -> list[dict]:
+    """Termos canônicos (perícias/condições/recursos/atributos) sem livros.
+
+    Usado quando o banco não tem léxico (nenhuma fonte ingerida ainda) —
+    assim o servidor/CLI reconhece pelo menos os termos fixos do sistema
+    em vez de não detectar absolutamente nada. Rituais/poderes nomeados
+    continuam exigindo `ingest.py` com os livros reais.
+    """
+    from .lexicon import canonical_entries
+    entries = canonical_entries(None)
+    return [
+        {"term": e.term, "category": e.category, "aliases": e.aliases,
+         "meta": e.meta, "summary": e.summary, "page": e.page,
+         "loc": e.loc, "title": None, "filename": None}
+        for e in entries
+    ]
+
+
 class Pipeline:
     """Junta STT + Detector. O áudio é fornecido como fluxo de frames."""
 
     def __init__(self, db_path: str = "ordem.db", model_size: str = "small",
                  device: str = "cpu", compute_type: str = "int8"):
         self.conn = dbmod.connect(db_path)
-        lexicon = dbmod.all_lexicon(self.conn)
+        lexicon = dbmod.all_lexicon(self.conn) or _canonical_fallback()
         self.detector = Detector(lexicon)
         # vocabulário para o viés do Whisper: nomes próprios primeiro
         # (rituais/poderes, que o STT mais erra), depois o resto do sistema

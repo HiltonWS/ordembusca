@@ -71,5 +71,7 @@ def load_lexicon() -> tuple[list[dict], bool]:
     if db_path.exists():
         from ordem import db as dbmod
         conn = dbmod.connect(db_path)
-        return dbmod.all_lexicon(conn), True
+        lexicon = dbmod.all_lexicon(conn)
+        if lexicon:
+            return lexicon, True
     return fixture_lexicon(), False

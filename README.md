@@ -170,6 +170,7 @@ python server.py --mic                 # ouve o microfone e transmite pra web
 python server.py --auto-io             # auto: microfone + loopback (se houver)
 python server.py --wav sessao.wav      # processa uma gravação
 python server.py --demo                # sem áudio: só o painel + teste por texto
+python server.py --demo --reload       # hot reload no navegador/servidor durante desenvolvimento
 ```
 
 Abra **http://localhost:8000**. A página mostra, lado a lado, a transmissão

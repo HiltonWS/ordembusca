@@ -21,7 +21,9 @@ import argparse
 import asyncio
 import collections
 import json
+import os
 import threading
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -29,6 +31,8 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 WEB_DIR = Path(__file__).parent / "web"
+ENV_CONFIG = "ORDEM_SERVER_CONFIG"
+APP_VERSION = f"{os.getpid()}:{time.time_ns()}"
 
 app = FastAPI(title="Ordem — Detector de Mecânicas")
 
@@ -37,6 +41,21 @@ _loop: asyncio.AbstractEventLoop | None = None
 _config: dict = {}
 _pipeline = None            # criado lazy (evita carregar Whisper em demo)
 _history: collections.deque[dict] = collections.deque(maxlen=4000)
+
+
+def _load_config_from_env() -> None:
+    raw = os.environ.get(ENV_CONFIG)
+    if not raw:
+        return
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return
+    if isinstance(data, dict):
+        _config.update(data)
+
+
+_load_config_from_env()
 
 
 class SimulateIn(BaseModel):
@@ -116,7 +135,8 @@ async def index() -> str:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"ok": True, "source": _config.get("source"), "clients": len(_clients)}
+    return {"ok": True, "version": APP_VERSION, "source": _config.get("source"),
+            "clients": len(_clients)}
 
 
 @app.post("/simulate")
@@ -160,6 +180,8 @@ def main() -> int:
     ap.add_argument("--aggressiveness", type=int, default=2)
     ap.add_argument("--padding-ms", type=int, default=550,
                     help="silêncio (ms) para fechar uma fala; maior = falas mais completas")
+    ap.add_argument("--reload", action="store_true",
+                    help="recarrega o servidor quando arquivos .py/.html mudarem")
     ap.add_argument("--host", default="0.0.0.0")
     ap.add_argument("--port", type=int, default=8000)
     args = ap.parse_args()
@@ -173,9 +195,18 @@ def main() -> int:
         aggressiveness=args.aggressiveness, padding_ms=args.padding_ms,
     )
 
+    os.environ[ENV_CONFIG] = json.dumps(_config, ensure_ascii=False)
+
     import uvicorn
     print(f"→ http://{args.host}:{args.port}  (fonte: {_config['source']})")
-    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    if args.reload:
+        uvicorn.run("server:app", host=args.host, port=args.port,
+                    log_level="warning", reload=True,
+                    reload_dirs=[str(Path(__file__).parent)],
+                    reload_includes=["*.py", "*.html"],
+                    reload_excludes=["*.pyc", "__pycache__/*"])
+    else:
+        uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     return 0
 
 
