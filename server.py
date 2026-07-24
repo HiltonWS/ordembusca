@@ -6,6 +6,7 @@ Whisper são bloqueantes) e os eventos são empurrados por WebSocket.
 
 Uso:
     python server.py --mic                 # ouve o microfone
+    python server.py --auto-io             # auto: mic + loopback (se houver)
     python server.py --wav sessao.wav      # processa uma gravação
     python server.py --demo                # sem áudio: só o endpoint /simulate
 
@@ -72,11 +73,17 @@ def _emit_from_thread(event: dict) -> None:
 
 def _audio_worker() -> None:
     """Thread: lê o áudio, roda o pipeline e emite eventos."""
-    from ordem.audio import frames_from_devices, frames_from_mic, frames_from_wav
+    from ordem.audio import (auto_select_devices, describe_devices,
+                             frames_from_devices, frames_from_mic,
+                             frames_from_wav)
 
     source = _config.get("source")
     if source == "devices":
         frames = frames_from_devices(_config["devices"])
+    elif source == "auto":
+        chosen = auto_select_devices()
+        print(f"Auto-IO: {describe_devices(chosen)}")
+        frames = frames_from_devices(chosen)
     elif source == "mic":
         frames = frames_from_mic(_config.get("mic_device"))
     elif source == "wav":
@@ -134,6 +141,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     src = ap.add_mutually_exclusive_group()
     src.add_argument("--mic", action="store_true")
+    src.add_argument("--auto-io", action="store_true",
+                     help="auto-detectar entrada + saida (loopback)")
     src.add_argument("--devices", type=int, nargs="+", metavar="N",
                      help="mixar dispositivos (mic + loopback do sistema)")
     src.add_argument("--wav")
@@ -146,12 +155,12 @@ def main() -> int:
     ap.add_argument("--aggressiveness", type=int, default=2)
     ap.add_argument("--padding-ms", type=int, default=550,
                     help="silêncio (ms) para fechar uma fala; maior = falas mais completas")
-    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--host", default="0.0.0.0")
     ap.add_argument("--port", type=int, default=8000)
     args = ap.parse_args()
 
     _config.update(
-        source=("devices" if args.devices else "mic" if args.mic
+        source=("devices" if args.devices else "auto" if args.auto_io else "mic" if args.mic
                 else "wav" if args.wav else "demo"),
         devices=args.devices,
         wav=args.wav, db=args.db, model=args.model, device=args.device,

@@ -105,6 +105,7 @@ python query.py --search "exposição paranormal"
 ```bash
 python listen.py --list-mics             # lista dispositivos; marca [LOOPBACK]
 python listen.py --mic                    # só o seu microfone
+python listen.py --auto-io                # auto: microfone + loopback (se houver)
 python listen.py --devices 1 5            # microfone + loopback (mesa inteira)
 python listen.py --wav sessao.wav         # testar com uma gravação primeiro
 python listen.py --mic --model medium --device cuda   # modelo maior em GPU
@@ -165,6 +166,7 @@ ao vivo — o pipeline é o mesmo.
 
 ```bash
 python server.py --mic                 # ouve o microfone e transmite pra web
+python server.py --auto-io             # auto: microfone + loopback (se houver)
 python server.py --wav sessao.wav      # processa uma gravação
 python server.py --demo                # sem áudio: só o painel + teste por texto
 ```
@@ -174,6 +176,15 @@ Abra **http://localhost:8000**. A página mostra, lado a lado, a transmissão
 codificado pela cor do elemento do ritual (Sangue, Morte, Conhecimento,
 Energia, Medo) ou pela categoria, com o **resumo da regra** e a página do
 livro.
+
+No **Codespaces**, use host aberto para forwarding de porta:
+
+```bash
+python server.py --auto-io --host 0.0.0.0
+```
+
+Se o ambiente nao expuser dispositivos de audio (comum em Codespaces web),
+use `--demo` ou `--wav`.
 
 No rodapé há um campo de texto: digite uma fala e veja a detecção na hora
 (útil para testar sem microfone, ou para o mestre lançar mecânicas manualmente).

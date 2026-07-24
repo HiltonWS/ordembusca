@@ -23,6 +23,19 @@ FRAME_SAMPLES = SAMPLE_RATE * FRAME_MS // 1000       # 480
 FRAME_BYTES = FRAME_SAMPLES * 2                      # int16 = 2 bytes
 
 
+def _get_sounddevice():
+    try:
+        import sounddevice as sd
+        return sd
+    except OSError:
+        raise SystemExit(
+            "PortAudio nao encontrado. Instale com: sudo apt update && "
+            "sudo apt install -y portaudio19-dev\n"
+            "Em Codespaces web, captura de audio pode nao estar disponivel; "
+            "use --wav ou --demo."
+        ) from None
+
+
 @dataclass
 class Utterance:
     audio: np.ndarray        # float32 mono 16kHz, faixa [-1, 1]
@@ -138,7 +151,7 @@ def list_input_devices() -> list[dict]:
     no Windows, 'Stereo Mix' ou cabos virtuais (VB-Cable); no macOS,
     drivers como BlackHole.
     """
-    import sounddevice as sd
+    sd = _get_sounddevice()
 
     marks = ("monitor", "loopback", "stereo mix", "mix", "blackhole",
              "vb-audio", "cable output", "what u hear")
@@ -153,6 +166,78 @@ def list_input_devices() -> list[dict]:
                 "loopback": any(m in name.lower() for m in marks),
             })
     return out
+
+
+def _choose_auto_devices(entries: list[dict], default_index: int | None) -> list[int]:
+    """Escolhe dispositivos para capturar entrada e saida automaticamente.
+
+    Prioridade:
+    1) microfone (nao-loopback) + loopback
+    2) entrada padrao
+    3) primeiro dispositivo de entrada
+    """
+    if not entries:
+        return []
+
+    by_index = {int(d["index"]): d for d in entries}
+    mics = [d for d in entries if not d["loopback"]]
+    loops = [d for d in entries if d["loopback"]]
+
+    if mics and loops:
+        mic = next((d for d in mics if int(d["index"]) == default_index), mics[0])
+        loop = next((d for d in loops if int(d["index"]) == default_index), loops[0])
+        if int(loop["index"]) == int(mic["index"]):
+            loop = next((d for d in loops if int(d["index"]) != int(mic["index"])), loop)
+        return [int(mic["index"]), int(loop["index"])]
+
+    if default_index is not None and default_index in by_index:
+        return [int(default_index)]
+    return [int(entries[0]["index"])]
+
+
+def auto_select_devices(require_loopback: bool = False) -> list[int]:
+    """Seleciona automaticamente entrada(s) para transcrever mesa online.
+
+    Retorna [mic, loopback] quando possivel. Se nao houver loopback,
+    retorna [mic] por padrao.
+    """
+    sd = _get_sounddevice()
+
+    entries = list_input_devices()
+    if not entries:
+        raise SystemExit(
+            "Nenhum dispositivo de entrada encontrado. "
+            "No Codespaces web isso e comum; use --wav ou --demo."
+        )
+
+    default_index: int | None = None
+    try:
+        info = sd.query_devices(None, "input")
+        default_index = int(info.get("index", sd.default.device[0]))
+    except (ValueError, sd.PortAudioError, TypeError, IndexError):
+        default_index = None
+
+    chosen = _choose_auto_devices(entries, default_index)
+    if require_loopback and len(chosen) < 2:
+        raise SystemExit(
+            "Nao encontrei dispositivo de loopback para capturar a saida do sistema. "
+            "Use --list-mics e selecione manualmente --devices <mic> <loopback>."
+        )
+    return chosen
+
+
+def describe_devices(indices: list[int]) -> str:
+    """Texto curto com nome dos dispositivos selecionados."""
+    sd = _get_sounddevice()
+
+    parts: list[str] = []
+    for idx in indices:
+        try:
+            info = sd.query_devices(idx)
+            parts.append(f"[{idx}] {info.get('name', 'desconhecido')}")
+        except (ValueError, sd.PortAudioError):
+            parts.append(f"[{idx}] desconhecido")
+    return " + ".join(parts)
 
 
 def mix_float_blocks(blocks: "list[np.ndarray]") -> bytes:
@@ -174,7 +259,7 @@ def _resolve_input_device(device):
       cai para o primeiro dispositivo de entrada disponível.
     - índice inválido ou de saída: erro claro listando as entradas.
     """
-    import sounddevice as sd
+    sd = _get_sounddevice()
 
     if device is None:
         try:
@@ -210,7 +295,7 @@ class _DeviceReader:
     def __init__(self, device: int | str | None):
         import threading
 
-        import sounddevice as sd
+        sd = _get_sounddevice()
 
         index, info = _resolve_input_device(device)
         self.native_sr = SAMPLE_RATE          # ajustado após abrir o stream

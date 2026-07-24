@@ -3,6 +3,7 @@
 
 Uso:
     python listen.py --mic                 # microfone ao vivo
+    python listen.py --auto-io             # auto: mic + loopback (se houver)
     python listen.py --wav sessao.wav      # testar com uma gravação
     python listen.py --mic --model medium  # modelo maior (precisa de GPU)
     python listen.py --list-mics           # listar microfones disponíveis
@@ -45,6 +46,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     src = ap.add_mutually_exclusive_group()
     src.add_argument("--mic", action="store_true", help="ouvir o microfone")
+    src.add_argument("--auto-io", action="store_true",
+                     help="auto-detectar entrada + saida (loopback)")
     src.add_argument("--wav", help="processar um arquivo WAV")
     src.add_argument("--devices", type=int, nargs="+", metavar="N",
                      help="mixar 2+ dispositivos (ex: --devices 1 5 = "
@@ -75,20 +78,26 @@ def main() -> int:
         print("  python listen.py --devices <mic> <loopback>")
         return 0
 
-    if not args.mic and not args.wav and not args.devices:
-        ap.error("escolha --mic, --wav ou --devices (ou --list-mics)")
+    if not args.mic and not args.auto_io and not args.wav and not args.devices:
+        ap.error("escolha --mic, --auto-io, --wav ou --devices (ou --list-mics)")
 
-    from ordem.audio import frames_from_devices, frames_from_mic, frames_from_wav
+    from ordem.audio import (auto_select_devices, describe_devices,
+                             frames_from_devices, frames_from_mic,
+                             frames_from_wav)
     from ordem.pipeline import Pipeline
 
     print(f"Carregando modelo Whisper '{args.model}' ({args.device})...",
           file=sys.stderr)
     pipe = Pipeline(args.db, args.model, args.device, args.compute)
-    print("Pronto. Ouvindo..." if (args.mic or args.devices)
+    print("Pronto. Ouvindo..." if (args.mic or args.devices or args.auto_io)
           else "Processando áudio...", file=sys.stderr)
 
     if args.devices:
         frames = frames_from_devices(args.devices)
+    elif args.auto_io:
+        chosen = auto_select_devices()
+        print(f"Auto-IO: {describe_devices(chosen)}", file=sys.stderr)
+        frames = frames_from_devices(chosen)
     elif args.mic:
         frames = frames_from_mic(args.mic_device)
     else:
