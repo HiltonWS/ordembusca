@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import collections
 import json
 import threading
 from pathlib import Path
@@ -35,6 +36,7 @@ _clients: set[WebSocket] = set()
 _loop: asyncio.AbstractEventLoop | None = None
 _config: dict = {}
 _pipeline = None            # criado lazy (evita carregar Whisper em demo)
+_history: collections.deque[dict] = collections.deque(maxlen=4000)
 
 
 class SimulateIn(BaseModel):
@@ -55,6 +57,7 @@ def get_pipeline():
 
 
 async def _broadcast(event: dict) -> None:
+    _history.append(event)
     dead = []
     for ws in _clients:
         try:
@@ -130,6 +133,8 @@ async def ws(websocket: WebSocket) -> None:
     _clients.add(websocket)
     await websocket.send_text(json.dumps({"type": "hello",
                                           "source": _config.get("source")}))
+    for ev in _history:
+        await websocket.send_text(json.dumps(ev, ensure_ascii=False))
     try:
         while True:
             await websocket.receive_text()   # mantém a conexão viva
