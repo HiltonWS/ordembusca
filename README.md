@@ -6,16 +6,17 @@ Sistema **100% local** que, a partir dos livros e PDFs de Ordem Paranormal,
 reconhece na fala da mesa *quais mecânicas estão sendo usadas* (perícias,
 rituais, condições, recursos) e mostra a regra e a página de referência.
 
-![Painel ao vivo — mecânicas oficiais](docs/screenshot-oficial.png)
-*Painel "Ordo Realitas": transcrição à esquerda, cards de mecânica à direita
-— ritual com elemento/círculo, perícia, condição, recursos, cada um com o
-resumo da regra e a referência de livro/página.*
+<p align="center">
+  <img src="docs/screenshots/painel-oficial.png" alt="Painel ao vivo — mecanicas oficiais" width="100%">
+  <br>
+  <sub>Painel "Ordo Realitas": transcricao a esquerda, cards de mecanica a direita, com resumo da regra e referencia de livro/pagina.</sub>
+</p>
 
-![Painel ao vivo — conteúdo homebrew](docs/screenshot-homebrew.png)
-*Conteúdo homebrew de um `.docx` de campanha: ritual do elemento customizado
-**Profundezas** (Abyssum Gate), Poder Paranormal (Antecipar) e poder de ficha
-(Saber é Poder) — incluindo detecção com fala distorcida ("konjura sopro do
-ca os" → Sopro do Caos).*
+<p align="center">
+  <img src="docs/screenshots/painel-homebrew.png" alt="Painel ao vivo — conteudo homebrew" width="100%">
+  <br>
+  <sub>Conteudo homebrew de campanha, com elemento customizado, poder paranormal e poder de ficha, incluindo deteccao com fala distorcida.</sub>
+</p>
 
 > **Aviso legal:** este repositório contém apenas **código**. Os livros de
 > Ordem Paranormal são material com direitos autorais e **não são (nem devem
@@ -265,7 +266,11 @@ Cada mecânica detectada traz um resumo curto da regra:
   dos Arquivos Secretos (`Nome` + `PODER PARANORMAL <ELEMENTO>`).
 - **Perícias, recursos, atributos**: resumo curado, estável.
 
-![Cards com versões faladas](docs/screenshot-versoes.png)
+<p align="center">
+  <img src="docs/screenshots/painel-versoes.png" alt="Cards com versoes faladas" width="100%">
+  <br>
+  <sub>Versoes faladas na mesa (Discente, Verdadeiro e Afinidade) destacadas no card com badge e resumo especifico.</sub>
+</p>
 
 ## Testes
 Duas formas de rodar:
