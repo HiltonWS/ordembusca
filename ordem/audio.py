@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import collections
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterator
 
 import numpy as np
@@ -114,16 +115,39 @@ class VADSegmenter:
 # ---- Fontes de frames -----------------------------------------------------
 
 def frames_from_wav(path: str) -> Iterator[bytes]:
-    """Frames de 30ms a partir de um WAV (convertido para 16kHz mono int16)."""
+    """Frames de 30ms a partir de um WAV (convertido para 16kHz mono int16).
+
+    Leitura em streaming para suportar arquivos grandes sem estourar memoria.
+    """
     import soundfile as sf
 
-    data, sr = sf.read(path, dtype="int16", always_2d=True)
-    data = data[:, 0]                      # canal 0 (mono)
-    if sr != SAMPLE_RATE:
-        data = _resample_int16(data, sr, SAMPLE_RATE)
-    pcm = data.tobytes()
-    for i in range(0, len(pcm) - FRAME_BYTES + 1, FRAME_BYTES):
-        yield pcm[i:i + FRAME_BYTES]
+    p = Path(path)
+    if not p.exists():
+        raise SystemExit(f"Arquivo WAV não encontrado: {path}")
+    if p.is_dir():
+        raise SystemExit(
+            f"{path!r} é uma pasta. Use um arquivo .wav, por exemplo: "
+            "samples/videoplayback.wav"
+        )
+
+    pending = bytearray()
+    with sf.SoundFile(str(p), "r") as f:
+        sr = int(f.samplerate)
+        block_frames = max(sr, FRAME_SAMPLES)  # ~1s por bloco na taxa nativa
+        for block in f.blocks(blocksize=block_frames, dtype="int16", always_2d=True):
+            mono = block[:, 0]  # canal 0 (mono)
+            if sr != SAMPLE_RATE:
+                mono = _resample_int16(mono, sr, SAMPLE_RATE)
+            pending.extend(mono.tobytes())
+            while len(pending) >= FRAME_BYTES:
+                yield bytes(pending[:FRAME_BYTES])
+                del pending[:FRAME_BYTES]
+
+    # Fecha o arquivo emitindo um ultimo frame preenchido com silencio.
+    if pending:
+        pad = FRAME_BYTES - len(pending)
+        pending.extend(b"\x00" * pad)
+        yield bytes(pending)
 
 
 def _resample_int16(data: np.ndarray, sr_in: int, sr_out: int) -> np.ndarray:
