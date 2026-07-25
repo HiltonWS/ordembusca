@@ -104,6 +104,16 @@ O navegador abrirá para autorizar leitura dos livros e criação do backup. O
 endereço e a preferência de backup ficam em `.ordem-drive/config.json`; nas
 próximas execuções basta usar `python ingest.py --drive`.
 
+Para sincronizar e reextrair somente os livros, sem verificar ou baixar assets
+de imagem, execute:
+
+```bash
+python ingest.py --drive-books-only --force --drive-interval 0
+```
+
+Sem `--force`, apenas livros novos ou alterados são ingeridos. O modo não apaga
+assets já armazenados; apenas os ignora nessa sincronização.
+
 O processo verifica a pasta a cada 5 minutos, ingere PDF, TXT, Markdown ou DOCX
 novos ou alterados, baixa PNG, JPG, JPEG e WebP como assets visuais e mantém um
 snapshot consistente de `ordem.db` na

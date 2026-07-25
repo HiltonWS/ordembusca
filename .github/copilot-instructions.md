@@ -86,6 +86,7 @@ python ingest.py --force <fonte>
 python ingest.py --drive-folder <URL-ou-ID> --drive-db-backup
 python ingest.py --drive
 python ingest.py --drive --drive-interval 0
+python ingest.py --drive-books-only --force --drive-interval 0
 python query.py "texto da mesa"
 python query.py --search "termo"
 python listen.py --list-mics

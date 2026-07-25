@@ -91,6 +91,7 @@ class DriveSync:
         token_path: str | Path = ".ordem-drive/token.json",
         service=None,
         progress: Callable[[dict], None] | None = None,
+        include_assets: bool = True,
     ):
         self.folder_id, self.folder_resource_key = folder_access_from(folder)
         self.cache_dir = Path(cache_dir)
@@ -99,6 +100,7 @@ class DriveSync:
         self.state_path = self.cache_dir.parent / "state.json"
         self._service = service
         self.progress = progress
+        self.download_supported = DOWNLOAD_SUPPORTED if include_assets else SUPPORTED
         self._folder_validated = False
 
     def _report(self, stage: str, **data) -> None:
@@ -375,7 +377,7 @@ class DriveSync:
             mime_type = candidate.get("mimeType", "")
             export = GOOGLE_EXPORTS.get(mime_type)
             extension = export[0] if export else Path(name).suffix.lower()
-            if export or extension in DOWNLOAD_SUPPORTED:
+            if export or extension in self.download_supported:
                 supported.append(remote)
 
         total = len(supported)
@@ -394,7 +396,7 @@ class DriveSync:
                 export_mime = None
             if mime_type.startswith("application/vnd.google-apps.") and not export:
                 continue
-            if Path(name).suffix.lower() not in DOWNLOAD_SUPPORTED:
+            if Path(name).suffix.lower() not in self.download_supported:
                 continue
 
             file_id = remote["id"]

@@ -19,9 +19,12 @@ from ordem.drive import (
 class FakeDriveSync(DriveSync):
     def __init__(
         self, folder: str, cache_dir, files: list[dict], payloads: dict[str, bytes],
-        progress=None,
+        progress=None, include_assets=True,
     ):
-        super().__init__(folder, cache_dir=cache_dir, progress=progress)
+        super().__init__(
+            folder, cache_dir=cache_dir, progress=progress,
+            include_assets=include_assets,
+        )
         self.files = files
         self.payloads = payloads
         self.download_count = 0
@@ -213,6 +216,25 @@ def test_sync_downloads_only_new_or_changed_supported_files(tmp_path):
     changed = sync.sync_once()
     assert changed[0].read_bytes() == second_payload
     assert sync.download_count == 3
+
+
+def test_sync_can_skip_assets_and_download_only_books(tmp_path):
+    files = [
+        {"id": "book-id", "name": "Livro.pdf", "mimeType": "application/pdf"},
+        {"id": "image-id", "name": "capa.png", "mimeType": "image/png"},
+    ]
+    sync = FakeDriveSync(
+        "folder-id",
+        tmp_path / "books",
+        files,
+        {"book-id": b"pdf", "image-id": b"png"},
+        include_assets=False,
+    )
+
+    downloaded = sync.sync_once()
+
+    assert [path.name for path in downloaded] == ["Livro.pdf"]
+    assert sync.download_count == 1
 
 
 def test_sync_reports_file_progress(tmp_path):

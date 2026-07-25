@@ -114,6 +114,8 @@ def main() -> int:
     ap.add_argument("--force", action="store_true", help="reprocessa fontes já ingeridas")
     ap.add_argument("--drive", action="store_true",
                     help="usa a pasta do Drive salva anteriormente")
+    ap.add_argument("--drive-books-only", action="store_true",
+                    help="sincroniza somente livros/documentos, sem baixar assets de imagem")
     ap.add_argument("--drive-folder", help="ID ou URL de uma pasta privada do Google Drive")
     ap.add_argument("--drive-config", default=".ordem-drive/config.json",
                     help="configuração local com a pasta lembrada")
@@ -137,7 +139,10 @@ def main() -> int:
     )
 
     config = load_drive_config(args.drive_config)
-    use_drive = args.drive or bool(args.drive_folder) or args.drive_db_backup is not None
+    use_drive = (
+        args.drive or args.drive_books_only or bool(args.drive_folder)
+        or args.drive_db_backup is not None
+    )
     drive_folder = args.drive_folder or (config.get("folder") if use_drive else None)
     if use_drive and not drive_folder:
         ap.error("nenhuma pasta salva; use --drive-folder URL na primeira execução")
@@ -173,6 +178,7 @@ def main() -> int:
             credentials_path=args.drive_credentials,
             token_path=args.drive_token,
             progress=print_drive_progress,
+            include_assets=not args.drive_books_only,
         )
         ingest_paths(conn, sync.cached_paths(), force=args.force)
         while True:
