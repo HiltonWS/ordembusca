@@ -69,6 +69,17 @@ class SimulateIn(BaseModel):
     text: str
 
 
+def _handle_asyncio_exception(loop: asyncio.AbstractEventLoop, context: dict) -> None:
+    exception = context.get("exception")
+    callback = str(context.get("handle", ""))
+    proactor_disconnect = (
+        isinstance(exception, ConnectionResetError)
+        and "_ProactorBasePipeTransport._call_connection_lost" in callback
+    )
+    if not proactor_disconnect:
+        loop.default_exception_handler(context)
+
+
 def get_pipeline():
     global _pipeline
     if _pipeline is None:
@@ -175,6 +186,7 @@ def _audio_worker() -> None:
 async def _startup() -> None:
     global _loop, _transcript_store
     _loop = asyncio.get_running_loop()
+    _loop.set_exception_handler(_handle_asyncio_exception)
     transcript_log = _config.get("transcript_log")
     if transcript_log and _transcript_store is None:
         from ordem.transcripts import TranscriptStore
