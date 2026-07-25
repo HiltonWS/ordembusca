@@ -1,5 +1,7 @@
 import json
 
+import fitz
+
 from ordem.story import StoryBoard
 from ordem.story_images import StoryIllustrator
 
@@ -44,6 +46,9 @@ def test_storyboard_renews_same_moment_and_generated_image(tmp_path):
     assert second["thumbnail"].endswith("story-1-2.png?v=2")
     assert not (tmp_path / "story-1-1.png").exists()
     assert (tmp_path / "story-1-2.png").exists()
+    pixmap = fitz.Pixmap(tmp_path / "story-1-2.png")
+    assert (pixmap.width, pixmap.height) == (960, 540)
+    assert len(set(pixmap.samples[::997])) > 20
 
 
 def test_storyboard_uses_mechanic_and_thumbnail_to_explain_scene():
