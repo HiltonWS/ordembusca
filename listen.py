@@ -81,9 +81,13 @@ def main() -> int:
     if not args.mic and not args.auto_io and not args.wav and not args.devices:
         ap.error("escolha --mic, --auto-io, --wav ou --devices (ou --list-mics)")
 
-    from ordem.audio import (auto_select_devices, describe_devices,
-                             frames_from_devices, frames_from_mic,
-                             frames_from_wav)
+    from ordem.audio import (
+        auto_select_devices,
+        describe_devices,
+        frames_from_devices,
+        frames_from_mic,
+        frames_from_wav,
+    )
     from ordem.pipeline import Pipeline
 
     print(f"Carregando modelo Whisper '{args.model}' ({args.device})...",

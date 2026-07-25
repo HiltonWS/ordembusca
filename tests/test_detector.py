@@ -13,9 +13,10 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from ordem.detect import Detector  # noqa: E402
-from tests.fixtures import load_lexicon  # noqa: E402
+from tests.fixtures import fixture_lexicon, load_lexicon  # noqa: E402
 
-LEXICON, FROM_DB = load_lexicon()
+LEXICON = fixture_lexicon()
+DB_LEXICON, FROM_DB = load_lexicon()
 
 
 @pytest.fixture(scope="session")
@@ -170,8 +171,9 @@ def test_negativos_simples(detector, text):
 
 # --------------------------------------------- cobertura (só com ordem.db)
 @pytest.mark.skipif(not FROM_DB, reason="requer ordem.db (livros ingeridos)")
-def test_cobertura_todos_os_rituais(detector):
-    rituais = [e["term"] for e in LEXICON if e["category"] == "ritual"]
+def test_cobertura_todos_os_rituais():
+    detector = Detector(DB_LEXICON)
+    rituais = [e["term"] for e in DB_LEXICON if e["category"] == "ritual"]
     assert len(rituais) >= 80
     falhas = [n for n in rituais
               if n not in terms_of(detector, f"o conjurador lança {n} agora")]

@@ -80,7 +80,9 @@ Para expor o servidor em Codespaces, use `--host 0.0.0.0`.
 2. Respeite o estado atual do Git e nao reverta alteracoes do usuario.
 3. Adicione ou ajuste testes proporcionais ao risco da mudanca.
 4. Execute primeiro o teste mais especifico para o trecho alterado.
-5. Antes de concluir, execute as validacoes gerais quando forem aplicaveis:
+5. Para cada funcionalidade nova, crie testes que cubram o comportamento
+  esperado e os casos de erro relevantes.
+6. Antes de concluir, execute as validacoes gerais quando forem aplicaveis:
 
 ```bash
 pytest
@@ -95,6 +97,9 @@ arquitetura que nao estejam resumidos aqui.
 
 - Ao concluir e validar uma alteracao solicitada, crie um commit com mensagem
   objetiva e envie a branch atual ao remoto com `git push`.
+- Antes de qualquer commit ou push, execute os testes e verificacoes de
+  qualidade aplicaveis. Se alguma validacao falhar, investigue e corrija a
+  causa antes de publicar; nunca envie alteracoes com testes quebrados.
 - Nao inclua no commit alteracoes preexistentes ou fora do escopo.
 - Nao faca commit ou push apenas quando o usuario pedir explicitamente para nao
   fazer, ou quando houver um bloqueio de autenticacao, permissao ou seguranca.

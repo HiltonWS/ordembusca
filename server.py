@@ -95,9 +95,13 @@ def _emit_from_thread(event: dict) -> None:
 
 def _audio_worker() -> None:
     """Thread: lê o áudio, roda o pipeline e emite eventos."""
-    from ordem.audio import (auto_select_devices, describe_devices,
-                             frames_from_devices, frames_from_mic,
-                             frames_from_wav)
+    from ordem.audio import (
+        auto_select_devices,
+        describe_devices,
+        frames_from_devices,
+        frames_from_mic,
+        frames_from_wav,
+    )
 
     source = _config.get("source")
     if source == "devices":
