@@ -17,8 +17,11 @@ from ordem.drive import (
 
 
 class FakeDriveSync(DriveSync):
-    def __init__(self, folder: str, cache_dir, files: list[dict], payloads: dict[str, bytes]):
-        super().__init__(folder, cache_dir=cache_dir)
+    def __init__(
+        self, folder: str, cache_dir, files: list[dict], payloads: dict[str, bytes],
+        progress=None,
+    ):
+        super().__init__(folder, cache_dir=cache_dir, progress=progress)
         self.files = files
         self.payloads = payloads
         self.download_count = 0
@@ -32,7 +35,10 @@ class FakeDriveSync(DriveSync):
     def _list_files(self) -> list[dict]:
         return self.files
 
-    def _download(self, file_id, destination, export_mime=None, resource_key=None) -> None:
+    def _download(
+        self, file_id, destination, export_mime=None, resource_key=None,
+        progress_data=None,
+    ) -> None:
         self.download_count += 1
         self.downloads.append((file_id, destination.name, export_mime, resource_key))
         destination.write_bytes(self.payloads[file_id])
@@ -209,6 +215,25 @@ def test_sync_downloads_only_new_or_changed_supported_files(tmp_path):
     assert sync.download_count == 3
 
 
+def test_sync_reports_file_progress(tmp_path):
+    events = []
+    sync = FakeDriveSync(
+        "folder-id",
+        tmp_path / "books",
+        [{"id": "book", "name": "Livro.pdf", "mimeType": "application/pdf"}],
+        {"book": b"pdf"},
+        progress=events.append,
+    )
+
+    sync.sync_once()
+
+    assert [(event["stage"], event.get("index"), event.get("total")) for event in events] == [
+        ("scan_complete", None, 1),
+        ("download_start", 1, 1),
+        ("download_done", 1, 1),
+    ]
+
+
 def test_sync_exports_native_google_document_as_docx(tmp_path):
     files = [
         {
@@ -242,6 +267,32 @@ def test_sync_exports_native_google_document_as_docx(tmp_path):
             None,
         )
     ]
+
+
+def test_updated_google_document_is_exported_again(tmp_path):
+    document = {
+        "id": "profundezas-doc",
+        "name": "Homebrews das Profundezas",
+        "mimeType": "application/vnd.google-apps.document",
+        "modifiedTime": "2026-07-25T10:00:00Z",
+    }
+    sync = FakeDriveSync(
+        "folder-id",
+        tmp_path / "books",
+        [document],
+        {"profundezas-doc": b"versao 1"},
+    )
+
+    first = sync.sync_once()[0]
+    assert first.read_bytes() == b"versao 1"
+
+    document["modifiedTime"] = "2026-07-25T11:00:00Z"
+    sync.payloads["profundezas-doc"] = b"versao 2"
+    second = sync.sync_once()[0]
+
+    assert second == first
+    assert second.read_bytes() == b"versao 2"
+    assert sync.download_count == 2
 
 
 def test_sync_resolves_shortcut_to_binary_target(tmp_path):

@@ -25,6 +25,43 @@ from ordem.lexicon import build_lexicon
 SUPPORTED = {".pdf", ".txt", ".md", ".docx"}
 
 
+def _format_bytes(value: int | None) -> str:
+    if value is None:
+        return "?"
+    amount = float(value)
+    for unit in ("B", "KB", "MB", "GB"):
+        if amount < 1024 or unit == "GB":
+            return f"{amount:.1f} {unit}"
+        amount /= 1024
+    return f"{amount:.1f} GB"
+
+
+def print_drive_progress(event: dict) -> None:
+    stage = event["stage"]
+    if stage == "scan_complete":
+        print(f"\nDrive: {event['total']} arquivo(s) encontrado(s)")
+        return
+    prefix = f"[Drive {event['index']}/{event['total']}] {event['name']}"
+    if stage == "file_cached":
+        print(f"{prefix}: já sincronizado")
+    elif stage == "download_start":
+        print(f"{prefix}: iniciando download")
+    elif stage == "download_progress":
+        downloaded = event.get("downloaded", 0)
+        byte_total = event.get("byte_total")
+        percent = (
+            f"{downloaded / byte_total * 100:5.1f}%" if byte_total else "   ..."
+        )
+        print(
+            f"\r{prefix}: {percent} ({_format_bytes(downloaded)}/"
+            f"{_format_bytes(byte_total)})",
+            end="",
+            flush=True,
+        )
+    elif stage == "download_done":
+        print(f"\r{prefix}: concluído ({_format_bytes(event['downloaded'])})")
+
+
 def collect_paths(inputs: list[str]) -> list[Path]:
     paths: list[Path] = []
     for item in inputs:
@@ -42,8 +79,10 @@ def collect_paths(inputs: list[str]) -> list[Path]:
 def ingest_paths(conn: sqlite3.Connection, paths: list[Path], force: bool = False) -> int:
     """Ingere arquivos locais e devolve quantas fontes foram atualizadas."""
     ingested = 0
-    for path in paths:
-        print(f"\n▶ {path.name}")
+    total = len(paths)
+    for index, path in enumerate(paths, start=1):
+        print(f"\n[{index}/{total}] ▶ {path.name}")
+        print("  etapa 1/4: lendo e extraindo texto...")
         try:
             source = extract.load(path)
         except Exception as e:  # noqa: BLE001
@@ -55,9 +94,12 @@ def ingest_paths(conn: sqlite3.Connection, paths: list[Path], force: bool = Fals
             continue
 
         print(f"  páginas com texto: {source.page_count}")
+        print("  etapa 2/4: dividindo em trechos...")
         chunks = chunk_source(source)
+        print(f"  etapa 3/4: construindo léxico ({len(chunks)} chunks)...")
         lex = build_lexicon(source)
         rituais = sum(1 for e in lex if e.category == "ritual")
+        print(f"  etapa 4/4: salvando {len(lex)} termos no banco...")
         result = dbmod.ingest_source(conn, source, chunks, lex)
         print(f"  chunks: {result['chunks']}  |  léxico: {result['lexicon']} "
               f"(rituais detectados: {rituais})")
@@ -130,6 +172,7 @@ def main() -> int:
             cache_dir=args.drive_cache,
             credentials_path=args.drive_credentials,
             token_path=args.drive_token,
+            progress=print_drive_progress,
         )
         ingest_paths(conn, sync.cached_paths(), force=args.force)
         while True:

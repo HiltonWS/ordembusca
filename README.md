@@ -111,6 +111,9 @@ mesma pasta. O banco só é enviado quando seu checksum muda. Use
 `--drive-interval 60` para mudar o intervalo, `--drive-interval 0` para executar
 uma vez ou `--no-drive-db-backup` para desativar e salvar essa preferência.
 Os downloads permanecem no cache local `.ordem-drive/`.
+Durante a sincronização, o terminal mostra `Drive X/Y`, nome do arquivo,
+percentual e bytes baixados. Na ingestão, cada fonte mostra `X/Y` e as etapas
+de extração, divisão em chunks, construção do léxico e gravação no banco.
 Todas as subpastas são percorridas recursivamente, inclusive atalhos que apontam
 para outras pastas acessíveis pela conta autorizada.
 

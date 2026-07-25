@@ -6,6 +6,7 @@ import json
 import re
 import sqlite3
 from pathlib import Path
+from typing import Callable
 from urllib.parse import parse_qs, urlparse
 
 SCOPES = [
@@ -89,6 +90,7 @@ class DriveSync:
         credentials_path: str | Path = "credentials.json",
         token_path: str | Path = ".ordem-drive/token.json",
         service=None,
+        progress: Callable[[dict], None] | None = None,
     ):
         self.folder_id, self.folder_resource_key = folder_access_from(folder)
         self.cache_dir = Path(cache_dir)
@@ -96,7 +98,12 @@ class DriveSync:
         self.token_path = Path(token_path)
         self.state_path = self.cache_dir.parent / "state.json"
         self._service = service
+        self.progress = progress
         self._folder_validated = False
+
+    def _report(self, stage: str, **data) -> None:
+        if self.progress:
+            self.progress({"stage": stage, **data})
 
     def _execute_folder_request(self, request):
         return self._execute_resource_request(
@@ -223,6 +230,7 @@ class DriveSync:
         destination: Path,
         export_mime: str | None = None,
         resource_key: str | None = None,
+        progress_data: dict | None = None,
     ) -> None:
         try:
             from googleapiclient.http import MediaIoBaseDownload
@@ -245,7 +253,14 @@ class DriveSync:
             downloader = MediaIoBaseDownload(stream, request)
             done = False
             while not done:
-                _, done = downloader.next_chunk()
+                status, done = downloader.next_chunk()
+                if status and progress_data:
+                    self._report(
+                        "download_progress",
+                        **progress_data,
+                        downloaded=status.resumable_progress,
+                        byte_total=status.total_size,
+                    )
 
     def _resolve_shortcut(self, remote: dict) -> dict:
         details = remote.get("shortcutDetails") or {}
@@ -349,7 +364,22 @@ class DriveSync:
         """Baixa arquivos novos/alterados e devolve seus caminhos locais."""
         state = self._load_state()
         downloaded = []
-        for remote in self._list_files():
+        remote_files = self._list_files()
+        self._report("scan_complete", total=len(remote_files))
+        supported = []
+        for remote in remote_files:
+            candidate = remote
+            if candidate.get("mimeType") == SHORTCUT_MIME:
+                candidate = self._resolve_shortcut(candidate)
+            name = Path(candidate.get("name", "")).name
+            mime_type = candidate.get("mimeType", "")
+            export = GOOGLE_EXPORTS.get(mime_type)
+            extension = export[0] if export else Path(name).suffix.lower()
+            if export or extension in DOWNLOAD_SUPPORTED:
+                supported.append(remote)
+
+        total = len(supported)
+        for index, remote in enumerate(supported, start=1):
             cache_id = remote["id"]
             if remote.get("mimeType") == SHORTCUT_MIME:
                 remote = self._resolve_shortcut(remote)
@@ -377,17 +407,21 @@ class DriveSync:
             target_dir = self.cache_dir / cache_id
             target = target_dir / name
             if state.get(cache_id) == fingerprint and target.exists():
+                self._report("file_cached", index=index, total=total, name=name)
                 if cache_id != file_id:
                     state.pop(file_id, None)
                 continue
 
             target_dir.mkdir(parents=True, exist_ok=True)
             temporary = target_dir / f".{name}.part"
+            progress_data = {"index": index, "total": total, "name": name}
+            self._report("download_start", **progress_data)
             self._download(
                 file_id,
                 temporary,
                 export_mime=export_mime,
                 resource_key=remote.get("resourceKey"),
+                progress_data=progress_data,
             )
             if remote.get("md5Checksum"):
                 if self._md5(temporary) != remote["md5Checksum"]:
@@ -401,6 +435,10 @@ class DriveSync:
             if cache_id != file_id:
                 state.pop(file_id, None)
             downloaded.append(target)
+            self._report(
+                "download_done", **progress_data, downloaded=target.stat().st_size,
+                byte_total=target.stat().st_size,
+            )
 
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         self.state_path.write_text(

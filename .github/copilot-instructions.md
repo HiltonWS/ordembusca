@@ -114,6 +114,8 @@ Atalhos do Drive devem ser resolvidos por `shortcutDetails.targetId`, incluindo
 ID do atalho como chave do cache/estado e o ID do alvo apenas para download.
 A sincronizacao deve percorrer subpastas recursivamente, incluindo atalhos para
 pastas, com conjunto de IDs visitados para evitar ciclos.
+O CLI de ingestao deve mostrar progresso por arquivo e etapa; downloads do
+Drive devem mostrar bytes e percentual quando a API fornecer tamanho total.
 Imagens PNG/JPG/JPEG/WebP do Drive sao assets, nao fontes textuais. Associe-as
 ao lexico por nome normalizado e use comparacao perceptual local apenas quando
 nao houver nome correspondente.
