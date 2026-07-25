@@ -109,6 +109,8 @@
     font-size:11px;color:var(--accent,#999);opacity:.9}
   .story{display:flex;flex-direction:column;gap:0;border-left:1px solid var(--line);margin-left:7px}
   .scene{position:relative;padding:0 0 22px 24px}
+  .scene.renewed{animation:renew .5s ease}
+  @keyframes renew{0%{filter:brightness(1.7)}100%{filter:brightness(1)}}
   .scene::before{content:"";position:absolute;left:-5px;top:7px;width:9px;height:9px;
     border-radius:50%;background:var(--sangue);box-shadow:0 0 8px var(--glow)}
   .scene .time{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)}
@@ -273,16 +275,19 @@ function addCard(d){
   autoscrollToBottom(cardsScroll);
 }
 function addStory(scene){
-  if(!scene||story.querySelector(`[data-scene="${scene.id}"]`)) return;
+  if(!scene) return;
   const seconds=Number(scene.start_s||0);
   const time=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;
-  const el=document.createElement('article'); el.className='scene'; el.dataset.scene=scene.id;
+  let el=story.querySelector(`[data-scene="${scene.id}"]`);
+  const updating=Boolean(el);
+  if(!el){el=document.createElement('article');el.className='scene';el.dataset.scene=scene.id;}
   const mechanics=(scene.mechanics||[]).map(item=>escapeHtml(item.term)).join(' · ');
   el.innerHTML=`<span class="time">${time}</span><h3>${escapeHtml(scene.title)}</h3>
     <p>${escapeHtml(scene.text)}</p>
     ${scene.thumbnail?`<img src="${encodeURI(scene.thumbnail)}" alt="${escapeHtml(scene.title)}" loading="lazy">`:''}
     ${mechanics?`<div class="mechanics">${mechanics}</div>`:''}`;
-  story.appendChild(el);
+  if(!updating)story.appendChild(el);else el.classList.add('renewed');
+  setTimeout(()=>el.classList.remove('renewed'),500);
   while(story.children.length>120) story.firstElementChild.remove();
 }
 function escapeHtml(s){return (s||'').replace(/[&<>"]/g,c=>(

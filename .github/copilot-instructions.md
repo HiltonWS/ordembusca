@@ -27,7 +27,8 @@ de voz, o processamento pode ser inteiramente local.
 - `ordem/pipeline.py`: orquestracao do audio ate os eventos detectados.
 - `ordem/transcripts.py`: registro opt-in em JSONL e Markdown para revisao.
 - `ordem/thumbnails.py`: associa assets pelo nome ou semelhanca visual local.
-- `ordem/story.py`: transforma transcricoes em storyboard limitado.
+- `ordem/story.py`: agrupa transcricoes em momentos renovaveis e limitados.
+- `ordem/story_images.py`: ilustra momentos localmente em bitmaps PNG.
 - `web/index.html`: painel web ao vivo.
 - `tests/`: testes do detector, audio, STT, Drive, colunas e glifos de dados.
 
@@ -95,7 +96,7 @@ python server.py --demo
 python server.py --mic
 python server.py --auto-io
 python server.py --auto-io --transcript-log transcripts
-python server.py --auto-io --assets-dir extras --story-limit 120
+python server.py --auto-io --assets-dir extras --story-limit 120 --story-moment 20
 python server.py --demo --story-transcript transcripts/SESSAO.jsonl
 ```
 

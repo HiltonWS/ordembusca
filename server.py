@@ -101,7 +101,12 @@ def get_storyboard():
     global _storyboard
     if _storyboard is None:
         from ordem.story import StoryBoard
-        _storyboard = StoryBoard(max_scenes=int(_config.get("story_limit", 120)))
+        from ordem.story_images import StoryIllustrator
+        _storyboard = StoryBoard(
+            max_scenes=int(_config.get("story_limit", 120)),
+            moment_seconds=float(_config.get("story_moment", 20)),
+            illustrator=StoryIllustrator(THUMBNAIL_DIR, THUMBNAIL_DIR),
+        )
         transcript = _config.get("story_transcript")
         if transcript:
             _storyboard.load_jsonl(transcript)
@@ -244,6 +249,8 @@ def main() -> int:
                     help="carrega uma transcrição JSONL anterior na aba História")
     ap.add_argument("--story-limit", type=int, default=120,
                     help="máximo de cenas mantidas em memória (default: 120)")
+    ap.add_argument("--story-moment", type=float, default=20, metavar="SEGUNDOS",
+                    help="janela para renovar a mesma cena (default: 20)")
     ap.add_argument("--reload", action="store_true",
                     help="recarrega o servidor quando arquivos .py/.html mudarem")
     ap.add_argument("--host", default="0.0.0.0")
@@ -260,6 +267,7 @@ def main() -> int:
         transcript_log=args.transcript_log,
         asset_dirs=args.assets_dir,
         story_transcript=args.story_transcript, story_limit=max(1, args.story_limit),
+        story_moment=max(1, args.story_moment),
     )
 
     os.environ[ENV_CONFIG] = json.dumps(_config, ensure_ascii=False)

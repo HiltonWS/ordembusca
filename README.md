@@ -239,13 +239,16 @@ correção sugerida. Eventos de áudio são marcados como `audio` e textos envia
 pelo campo do painel como `manual`. A pasta `transcripts/` é ignorada pelo Git;
 revise consentimento e privacidade antes de gravar outras pessoas.
 
-O painel possui as abas **Mecânicas** e **História**. História transforma cada
-fala em uma cena com título, mecânicas e arte do ritual/item quando disponível.
-Para carregar uma sessão anterior:
+O painel possui as abas **Mecânicas** e **História**. História agrupa as falas
+em momentos e renova a cena atual conforme a ação avança. Cada momento recebe
+uma composição PNG criada localmente, com silhuetas e elementos de ritual,
+combate, perseguição ou condição; a arte de ritual/item disponível é incorporada
+à cena. Nenhum serviço externo recebe a transcrição. Para carregar uma sessão
+anterior ou ajustar a janela de renovação (20 segundos por padrão):
 
 ```bash
 python server.py --demo --story-transcript transcripts/SESSAO.jsonl
-python server.py --auto-io --assets-dir meus_tokens --story-limit 120
+python server.py --auto-io --assets-dir meus_tokens --story-limit 120 --story-moment 20
 ```
 
 Para evitar crescimento ilimitado de memória, o servidor guarda 300 eventos e
@@ -287,6 +290,7 @@ ordem/
   thumbnails.py associação de tokens/extras e imagens de páginas
   transcripts.py registro opt-in em JSONL e Markdown
   story.py      storyboard limitado construído das transcrições
+  story_images.py ilustração bitmap local dos momentos da história
 ingest.py      CLI de ingestão
 query.py       CLI de detecção/busca (sem áudio)
 listen.py      CLI de escuta ao vivo (microfone ou WAV)

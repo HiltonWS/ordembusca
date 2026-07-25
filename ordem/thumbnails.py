@@ -39,6 +39,7 @@ class ThumbnailResolver:
                 self._source_files[normalize_term(title)] = filename
         self._assets = self._index_assets(asset_roots)
         self._unknown_assets = self._index_unknown_assets(asset_roots)
+        self._hash_cache: dict[Path, int | None] = {}
         self._sources = self._index_sources(source_roots)
 
     def _index_assets(self, roots: list[str | Path]) -> dict[str, Path]:
@@ -63,6 +64,7 @@ class ThumbnailResolver:
             for path in root.rglob("*")
             if path.is_file()
             and path.suffix.lower() in IMAGE_EXTENSIONS
+            and not path.name.startswith("story-")
             and path not in assets
         ]
 
@@ -136,12 +138,12 @@ class ThumbnailResolver:
         return target
 
     def _closest_visual_asset(self, reference: Path) -> Path | None:
-        reference_hash = self._average_hash(reference)
+        reference_hash = self._cached_hash(reference)
         if reference_hash is None:
             return None
         best: tuple[int, Path] | None = None
         for candidate in self._unknown_assets:
-            candidate_hash = self._average_hash(candidate)
+            candidate_hash = self._cached_hash(candidate)
             if candidate_hash is None:
                 continue
             distance = (reference_hash ^ candidate_hash).bit_count()
@@ -149,11 +151,16 @@ class ThumbnailResolver:
                 best = (distance, candidate)
         return best[1] if best and best[0] <= 6 else None
 
+    def _cached_hash(self, path: Path) -> int | None:
+        if path not in self._hash_cache:
+            self._hash_cache[path] = self._average_hash(path)
+        return self._hash_cache[path]
+
     @staticmethod
     def _average_hash(path: Path) -> int | None:
         try:
             pixmap = fitz.Pixmap(path)
-        except (RuntimeError, ValueError):
+        except Exception:  # noqa: BLE001 -- assets locais podem ter conteúdo inválido
             return None
         if pixmap.width < 2 or pixmap.height < 2:
             return None

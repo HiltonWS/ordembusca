@@ -67,3 +67,17 @@ def test_unnamed_asset_is_visually_matched_to_book_art(tmp_path):
     assert url and url.startswith("/thumbnails/sopro-do-caos-")
     cached = tmp_path / "cache" / url.rsplit("/", 1)[-1]
     assert cached.read_bytes() == image
+
+
+def test_malformed_image_asset_is_ignored(tmp_path):
+    asset = tmp_path / "token.png"
+    asset.write_text("not an image", encoding="utf-8")
+
+    assert ThumbnailResolver._average_hash(asset) is None
+
+
+def test_generated_story_images_are_not_visual_candidates(tmp_path):
+    (tmp_path / "story-1-1.png").write_bytes(_gradient_png())
+    resolver = ThumbnailResolver([], [tmp_path], [], tmp_path / "cache")
+
+    assert resolver._unknown_assets == []
