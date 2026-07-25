@@ -4,12 +4,17 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sqlite3
 from pathlib import Path
 from urllib.parse import urlparse
 
-SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+SCOPES = [
+    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/drive.file",
+]
 SUPPORTED = {".pdf", ".txt", ".md", ".docx"}
 FOLDER_MIME = "application/vnd.google-apps.folder"
+DEFAULT_CONFIG_PATH = Path(".ordem-drive/config.json")
 
 
 class DriveSetupError(RuntimeError):
@@ -28,6 +33,35 @@ def folder_id_from(value: str) -> str:
     if not re.fullmatch(r"[A-Za-z0-9_-]+", value):
         raise DriveSetupError("ID da pasta do Drive inválido")
     return value
+
+
+def load_drive_config(path: str | Path = DEFAULT_CONFIG_PATH) -> dict:
+    config_path = Path(path)
+    if not config_path.exists():
+        return {}
+    try:
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_drive_config(
+    folder: str,
+    database_backup: bool = False,
+    path: str | Path = DEFAULT_CONFIG_PATH,
+) -> None:
+    folder_id_from(folder)
+    config_path = Path(path)
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        json.dumps(
+            {"folder": folder, "database_backup": database_backup},
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
 
 class DriveSync:
@@ -62,6 +96,8 @@ class DriveSync:
         credentials = None
         if self.token_path.exists():
             credentials = Credentials.from_authorized_user_file(str(self.token_path), SCOPES)
+            if not credentials.has_scopes(SCOPES):
+                credentials = None
         if not credentials or not credentials.valid:
             if credentials and credentials.expired and credentials.refresh_token:
                 credentials.refresh(Request())
@@ -114,6 +150,60 @@ class DriveSync:
             done = False
             while not done:
                 _, done = downloader.next_chunk()
+
+    def _find_remote_database(self, name: str) -> dict | None:
+        response = self._get_service().files().list(
+            q=(
+                f"'{self.folder_id}' in parents and trashed = false and "
+                "appProperties has { key='ordemBusca' and value='database' }"
+            ),
+            fields="files(id,name,md5Checksum)",
+            spaces="drive",
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True,
+        ).execute()
+        return next(
+            (item for item in response.get("files", []) if item.get("name") == name),
+            None,
+        )
+
+    def _upload_database_file(
+        self,
+        snapshot: Path,
+        name: str,
+        remote_id: str | None,
+    ) -> dict:
+        try:
+            from googleapiclient.http import MediaFileUpload
+        except ImportError as exc:
+            raise DriveSetupError(
+                "dependências do Google Drive ausentes; execute pip install -r requirements.txt"
+            ) from exc
+
+        media = MediaFileUpload(
+            str(snapshot), mimetype="application/x-sqlite3", resumable=True
+        )
+        service = self._get_service()
+        if remote_id:
+            request = service.files().update(
+                fileId=remote_id,
+                body={"name": name},
+                media_body=media,
+                fields="id,name,md5Checksum,modifiedTime",
+                supportsAllDrives=True,
+            )
+        else:
+            request = service.files().create(
+                body={
+                    "name": name,
+                    "parents": [self.folder_id],
+                    "appProperties": {"ordemBusca": "database"},
+                },
+                media_body=media,
+                fields="id,name,md5Checksum,modifiedTime",
+                supportsAllDrives=True,
+            )
+        return request.execute()
 
     def _load_state(self) -> dict[str, dict]:
         if not self.state_path.exists():
@@ -180,3 +270,24 @@ class DriveSync:
             json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         return downloaded
+
+    def backup_database(self, conn: sqlite3.Connection, db_path: str | Path) -> bool:
+        """Envia um snapshot consistente do SQLite se o conteúdo mudou."""
+        name = Path(db_path).name
+        snapshot = self.cache_dir.parent / f".{name}.upload"
+        snapshot.parent.mkdir(parents=True, exist_ok=True)
+        snapshot_conn = sqlite3.connect(snapshot)
+        try:
+            conn.backup(snapshot_conn)
+        finally:
+            snapshot_conn.close()
+
+        try:
+            remote = self._find_remote_database(name)
+            checksum = self._md5(snapshot)
+            if remote and remote.get("md5Checksum") == checksum:
+                return False
+            self._upload_database_file(snapshot, name, remote.get("id") if remote else None)
+            return True
+        finally:
+            snapshot.unlink(missing_ok=True)

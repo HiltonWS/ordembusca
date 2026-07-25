@@ -70,7 +70,13 @@ def main() -> int:
     ap.add_argument("inputs", nargs="*", help="arquivos ou pastas")
     ap.add_argument("--db", default="ordem.db", help="caminho do banco (default: ordem.db)")
     ap.add_argument("--force", action="store_true", help="reprocessa fontes já ingeridas")
+    ap.add_argument("--drive", action="store_true",
+                    help="usa a pasta do Drive salva anteriormente")
     ap.add_argument("--drive-folder", help="ID ou URL de uma pasta privada do Google Drive")
+    ap.add_argument("--drive-config", default=".ordem-drive/config.json",
+                    help="configuração local com a pasta lembrada")
+    ap.add_argument("--drive-db-backup", action=argparse.BooleanOptionalAction, default=None,
+                    help="ativa/desativa o backup automático do SQLite no Drive")
     ap.add_argument("--drive-credentials", default="credentials.json",
                     help="JSON do cliente OAuth (default: credentials.json)")
     ap.add_argument("--drive-token", default=".ordem-drive/token.json",
@@ -81,8 +87,35 @@ def main() -> int:
                     help="intervalo da sincronização; 0 executa uma vez (default: 300)")
     args = ap.parse_args()
 
+    from ordem.drive import (
+        DriveSetupError,
+        DriveSync,
+        load_drive_config,
+        save_drive_config,
+    )
+
+    config = load_drive_config(args.drive_config)
+    use_drive = args.drive or bool(args.drive_folder) or args.drive_db_backup is not None
+    drive_folder = args.drive_folder or (config.get("folder") if use_drive else None)
+    if use_drive and not drive_folder:
+        ap.error("nenhuma pasta salva; use --drive-folder URL na primeira execução")
+    database_backup = (
+        args.drive_db_backup
+        if args.drive_db_backup is not None
+        else bool(config.get("database_backup", False))
+    )
+    if drive_folder and (args.drive_folder or args.drive_db_backup is not None):
+        try:
+            save_drive_config(
+                drive_folder,
+                database_backup=database_backup,
+                path=args.drive_config,
+            )
+        except DriveSetupError as exc:
+            ap.error(str(exc))
+
     paths = collect_paths(args.inputs)
-    if not paths and not args.drive_folder:
+    if not paths and not drive_folder:
         print("Nenhum arquivo suportado encontrado.")
         return 1
     if args.drive_interval < 0:
@@ -91,11 +124,9 @@ def main() -> int:
     conn = dbmod.connect(args.db)
     ingest_paths(conn, paths, force=args.force)
 
-    if args.drive_folder:
-        from ordem.drive import DriveSetupError, DriveSync
-
+    if drive_folder:
         sync = DriveSync(
-            args.drive_folder,
+            drive_folder,
             cache_dir=args.drive_cache,
             credentials_path=args.drive_credentials,
             token_path=args.drive_token,
@@ -109,6 +140,10 @@ def main() -> int:
                     ingest_paths(conn, downloaded, force=args.force)
                 else:
                     print("\nDrive: nenhuma alteração")
+                if database_backup:
+                    uploaded = sync.backup_database(conn, args.db)
+                    status = "backup do banco atualizado" if uploaded else "banco já atualizado"
+                    print(f"Drive: {status}")
             except DriveSetupError as exc:
                 print(f"Drive: {exc}")
                 conn.close()

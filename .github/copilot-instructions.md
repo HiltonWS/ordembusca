@@ -12,7 +12,7 @@ de voz, o processamento pode ser inteiramente local.
 
 ## Mapa do codigo
 
-- `ingest.py`: CLI de ingestao de arquivos PDF, TXT e DOCX.
+- `ingest.py`: CLI de ingestao local e sincronizacao automatica com Drive.
 - `query.py`: CLI de busca e deteccao textual sem audio.
 - `listen.py`: CLI de escuta por microfone, loopback ou WAV.
 - `server.py`: servidor FastAPI e WebSocket do painel em tempo real.
@@ -20,17 +20,20 @@ de voz, o processamento pode ser inteiramente local.
 - `ordem/chunk.py`: divisao do texto com metadados de pagina ou secao.
 - `ordem/lexicon.py`: extracao de rituais, poderes e termos canonicos.
 - `ordem/db.py`: persistencia SQLite e busca FTS5.
+- `ordem/drive.py`: OAuth, cache dos livros e backup SQLite no Google Drive.
 - `ordem/detect.py`: deteccao fuzzy e fonetica de mecanicas.
 - `ordem/audio.py`: captura, mixagem, reamostragem e VAD.
 - `ordem/stt.py`: transcricao local com faster-whisper.
 - `ordem/pipeline.py`: orquestracao do audio ate os eventos detectados.
 - `web/index.html`: painel web ao vivo.
-- `tests/`: testes do detector, audio, STT, colunas e glifos de dados.
+- `tests/`: testes do detector, audio, STT, Drive, colunas e glifos de dados.
 
 ## Regras importantes
 
 - Nunca adicione PDFs, DOCX de livros ou bancos `*.db` ao repositorio. Eles
   podem conter material protegido por direitos autorais e dados derivados.
+- Nunca versione `credentials.json`, tokens OAuth ou `.ordem-drive/`. A pasta
+  do Drive e a preferencia de backup ficam apenas no config local ignorado.
 - Preserve o funcionamento offline e evite introduzir servicos externos no
   caminho principal.
 - O detector deve continuar tolerante a erros de transcricao em portugues,
@@ -40,12 +43,15 @@ de voz, o processamento pode ser inteiramente local.
 - Mantenha referencias de origem por livro e pagina, ou por fonte e secao.
 - Prefira alteracoes pequenas e consistentes com as abstracoes existentes.
 - Nao altere arquivos ou comportamento fora do escopo solicitado.
+- Sempre atualize este arquivo e o `README.md` quando comandos, dependencias,
+  arquitetura ou rotinas operacionais forem alterados.
 
 ## Dependencias
 
 - Nucleo: PyMuPDF, rapidfuzz e python-docx.
 - Voz: faster-whisper, webrtcvad-wheels, sounddevice, soundfile e numpy.
 - Web: FastAPI, Uvicorn, watchfiles, websockets e Pydantic.
+- Drive: google-api-python-client, google-auth-httplib2 e google-auth-oauthlib.
 - Desenvolvimento: pytest, Ruff e build.
 
 Instale o ambiente completo com:
@@ -59,6 +65,9 @@ pip install -r requirements.txt
 ```bash
 python ingest.py <arquivos-ou-pastas>
 python ingest.py --force <fonte>
+python ingest.py --drive-folder <URL-ou-ID> --drive-db-backup
+python ingest.py --drive
+python ingest.py --drive --drive-interval 0
 python query.py "texto da mesa"
 python query.py --search "termo"
 python listen.py --list-mics
@@ -69,6 +78,13 @@ python server.py --demo
 python server.py --mic
 python server.py --auto-io
 ```
+
+Na primeira configuracao do Drive, use um cliente OAuth do tipo Desktop e
+salve o JSON como `credentials.json`. O endereco informado por
+`--drive-folder` e lembrado em `.ordem-drive/config.json`; depois use apenas
+`--drive`. Com `--drive-db-backup`, um snapshot consistente de `ordem.db` e
+enviado somente quando o checksum mudar. A sincronizacao do banco e local para
+Drive e nao restaura/sobrescreve automaticamente uma base local.
 
 Em Codespaces ou ambientes sem dispositivos de audio, use `--demo` ou `--wav`.
 Para expor o servidor em Codespaces, use `--host 0.0.0.0`.

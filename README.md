@@ -82,21 +82,31 @@ python ingest.py --force livro.pdf              # reprocessa uma fonte
 
 **Sincronizar uma pasta privada do Google Drive automaticamente:**
 
-1. No Google Cloud Console, ative a Google Drive API e crie um cliente OAuth
-   do tipo **Aplicativo para computador**.
-2. Baixe o JSON do cliente como `credentials.json` na raiz do projeto. Esse
-   arquivo e o token de acesso são ignorados pelo Git.
-3. Inicie a sincronização usando o link ou o ID da pasta:
+1. Abra o [Google Cloud Console](https://console.cloud.google.com/), crie ou
+   selecione um projeto e, em **APIs e serviços > Biblioteca**, ative a
+   **Google Drive API**.
+2. Em **Google Auth Platform**, preencha **Branding** e selecione audiência
+   **Externo**. Enquanto o aplicativo estiver em teste, adicione seu e-mail em
+   **Audience > Test users**.
+3. Em **Clients**, clique em **Create client**, escolha **Desktop app** e baixe
+   o JSON. Renomeie-o para `credentials.json` na raiz do projeto. Credenciais,
+   tokens, livros e banco são ignorados pelo Git.
+4. Na primeira execução, informe o link da pasta e ative o backup do banco:
 
 ```bash
-python ingest.py --drive-folder "https://drive.google.com/drive/folders/SEU_ID"
+python ingest.py --drive-folder "https://drive.google.com/drive/folders/SEU_ID" --drive-db-backup
 ```
 
-Na primeira execução, o navegador abrirá para autorizar acesso somente leitura.
-O processo verifica a pasta a cada 5 minutos e ingere apenas PDF, TXT, Markdown
-ou DOCX novos ou alterados. Use `--drive-interval 60` para mudar o intervalo ou
-`--drive-interval 0` para sincronizar uma única vez. Os downloads permanecem no
-cache local `.ordem-drive/` e não são enviados ao repositório.
+O navegador abrirá para autorizar leitura dos livros e criação do backup. O
+endereço e a preferência de backup ficam em `.ordem-drive/config.json`; nas
+próximas execuções basta usar `python ingest.py --drive`.
+
+O processo verifica a pasta a cada 5 minutos, ingere apenas PDF, TXT, Markdown
+ou DOCX novos ou alterados e mantém um snapshot consistente de `ordem.db` na
+mesma pasta. O banco só é enviado quando seu checksum muda. Use
+`--drive-interval 60` para mudar o intervalo, `--drive-interval 0` para executar
+uma vez ou `--no-drive-db-backup` para desativar e salvar essa preferência.
+Os downloads permanecem no cache local `.ordem-drive/`.
 
 **Detectar mecânicas numa frase** (simula o que a voz vai enviar):
 
