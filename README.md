@@ -111,6 +111,11 @@ mesma pasta. O banco só é enviado quando seu checksum muda. Use
 uma vez ou `--no-drive-db-backup` para desativar e salvar essa preferência.
 Os downloads permanecem no cache local `.ordem-drive/`.
 
+Arquivos nativos do Google também são tratados: Google Docs é exportado para
+DOCX e Google Slides para PDF antes da ingestão. Planilhas e outros formatos
+nativos sem representação útil para livros são ignorados. Atalhos dentro da
+pasta são resolvidos e o arquivo de destino é sincronizado.
+
 Se aparecer **pasta não encontrada ou sem acesso**, confirme que a pasta foi
 compartilhada com a mesma conta escolhida na autorização. Para trocar de conta,
 apague `.ordem-drive/token.json` e execute `python ingest.py --drive` novamente.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sqlite3
 
 import pytest
@@ -21,6 +22,7 @@ class FakeDriveSync(DriveSync):
         self.files = files
         self.payloads = payloads
         self.download_count = 0
+        self.downloads = []
         self.remote_database = None
         self.upload_count = 0
 
@@ -30,9 +32,13 @@ class FakeDriveSync(DriveSync):
     def _list_files(self) -> list[dict]:
         return self.files
 
-    def _download(self, file_id, destination) -> None:
+    def _download(self, file_id, destination, export_mime=None, resource_key=None) -> None:
         self.download_count += 1
+        self.downloads.append((file_id, destination.name, export_mime, resource_key))
         destination.write_bytes(self.payloads[file_id])
+
+    def _resolve_shortcut(self, remote: dict) -> dict:
+        return remote["resolved"]
 
     def _find_remote_database(self, name: str) -> dict | None:
         return self.remote_database
@@ -145,6 +151,81 @@ def test_sync_downloads_only_new_or_changed_supported_files(tmp_path):
     changed = sync.sync_once()
     assert changed[0].read_bytes() == second_payload
     assert sync.download_count == 2
+
+
+def test_sync_exports_native_google_document_as_docx(tmp_path):
+    files = [
+        {
+            "id": "document-id",
+            "name": "Anotações da campanha",
+            "mimeType": "application/vnd.google-apps.document",
+            "modifiedTime": "2026-07-25T12:00:00Z",
+        },
+        {
+            "id": "sheet-id",
+            "name": "Tabela",
+            "mimeType": "application/vnd.google-apps.spreadsheet",
+            "modifiedTime": "2026-07-25T12:00:00Z",
+        },
+    ]
+    sync = FakeDriveSync(
+        "folder-id",
+        tmp_path / "books",
+        files,
+        {"document-id": b"docx exportado"},
+    )
+
+    downloaded = sync.sync_once()
+
+    assert [path.name for path in downloaded] == ["Anotações da campanha.docx"]
+    assert sync.downloads == [
+        (
+            "document-id",
+            ".Anotações da campanha.docx.part",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            None,
+        )
+    ]
+
+
+def test_sync_resolves_shortcut_to_binary_target(tmp_path):
+    files = [
+        {
+            "id": "shortcut-id",
+            "name": "Livro.pdf",
+            "mimeType": "application/vnd.google-apps.shortcut",
+            "resolved": {
+                "id": "target-id",
+                "name": "Livro.pdf",
+                "mimeType": "application/pdf",
+                "modifiedTime": "2026-07-25T13:00:00Z",
+                "md5Checksum": hashlib.md5(b"pdf", usedforsecurity=False).hexdigest(),
+                "resourceKey": "target-key",
+            },
+        }
+    ]
+    sync = FakeDriveSync(
+        "folder-id",
+        tmp_path / "books",
+        files,
+        {"target-id": b"pdf"},
+    )
+
+    downloaded = sync.sync_once()
+
+    assert [path.name for path in downloaded] == ["Livro.pdf"]
+    assert downloaded[0].parent.name == "shortcut-id"
+    assert "shortcut-id" in sync._load_state()
+    assert "target-id" not in sync._load_state()
+    assert sync.downloads == [
+        ("target-id", ".Livro.pdf.part", None, "target-key")
+    ]
+
+    state = sync._load_state()
+    state["target-id"] = state["shortcut-id"]
+    sync.state_path.write_text(json.dumps(state), encoding="utf-8")
+    assert sync.sync_once() == []
+    assert "target-id" not in sync._load_state()
 
 
 def test_database_backup_uploads_only_when_snapshot_changes(tmp_path):

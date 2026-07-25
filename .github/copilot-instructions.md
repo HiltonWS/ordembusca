@@ -87,6 +87,11 @@ enviado somente quando o checksum mudar. A sincronizacao do banco e local para
 Drive e nao restaura/sobrescreve automaticamente uma base local.
 Links completos de pasta sao aceitos e devem preservar `resourcekey`; prefira
 o link compartilhado inteiro ao ID quando essa chave estiver presente.
+Arquivos Google Docs devem ser exportados para DOCX e Google Slides para PDF;
+nao use `get_media` para tipos nativos `application/vnd.google-apps.*`.
+Atalhos do Drive devem ser resolvidos por `shortcutDetails.targetId`, incluindo
+`targetResourceKey`, antes de baixar ou decidir o formato de exportacao. Use o
+ID do atalho como chave do cache/estado e o ID do alvo apenas para download.
 Um erro 404 da API ao validar a pasta normalmente significa ID incorreto ou
 conta OAuth sem acesso. Oriente a compartilhar a pasta com a conta autorizada
 ou remover `.ordem-drive/token.json` para escolher outra conta.

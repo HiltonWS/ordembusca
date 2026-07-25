@@ -14,7 +14,15 @@ SCOPES = [
 ]
 SUPPORTED = {".pdf", ".txt", ".md", ".docx"}
 FOLDER_MIME = "application/vnd.google-apps.folder"
+SHORTCUT_MIME = "application/vnd.google-apps.shortcut"
 DEFAULT_CONFIG_PATH = Path(".ordem-drive/config.json")
+GOOGLE_EXPORTS = {
+    "application/vnd.google-apps.document": (
+        ".docx",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ),
+    "application/vnd.google-apps.presentation": (".pdf", "application/pdf"),
+}
 
 
 class DriveSetupError(RuntimeError):
@@ -89,9 +97,15 @@ class DriveSync:
         self._folder_validated = False
 
     def _execute_folder_request(self, request):
-        if self.folder_resource_key:
+        return self._execute_resource_request(
+            request, self.folder_id, self.folder_resource_key
+        )
+
+    @staticmethod
+    def _execute_resource_request(request, file_id: str, resource_key: str | None):
+        if resource_key:
             request.headers["X-Goog-Drive-Resource-Keys"] = (
-                f"{self.folder_id}/{self.folder_resource_key}"
+                f"{file_id}/{resource_key}"
             )
         return request.execute()
 
@@ -164,7 +178,10 @@ class DriveSync:
         while True:
             request = service.files().list(
                 q=f"'{self.folder_id}' in parents and trashed = false",
-                fields="nextPageToken, files(id,name,mimeType,modifiedTime,md5Checksum)",
+                fields=(
+                    "nextPageToken, files(id,name,mimeType,modifiedTime,md5Checksum,"
+                    "shortcutDetails(targetId,targetMimeType,targetResourceKey))"
+                ),
                 pageToken=page_token,
                 spaces="drive",
                 supportsAllDrives=True,
@@ -176,7 +193,13 @@ class DriveSync:
             if not page_token:
                 return files
 
-    def _download(self, file_id: str, destination: Path) -> None:
+    def _download(
+        self,
+        file_id: str,
+        destination: Path,
+        export_mime: str | None = None,
+        resource_key: str | None = None,
+    ) -> None:
         try:
             from googleapiclient.http import MediaIoBaseDownload
         except ImportError as exc:
@@ -184,14 +207,37 @@ class DriveSync:
                 "dependências do Google Drive ausentes; execute pip install -r requirements.txt"
             ) from exc
 
-        request = self._get_service().files().get_media(
-            fileId=file_id, supportsAllDrives=True
-        )
+        if export_mime:
+            request = self._get_service().files().export_media(
+                fileId=file_id, mimeType=export_mime
+            )
+        else:
+            request = self._get_service().files().get_media(
+                fileId=file_id, supportsAllDrives=True
+            )
+        if resource_key:
+            request.headers["X-Goog-Drive-Resource-Keys"] = f"{file_id}/{resource_key}"
         with destination.open("wb") as stream:
             downloader = MediaIoBaseDownload(stream, request)
             done = False
             while not done:
                 _, done = downloader.next_chunk()
+
+    def _resolve_shortcut(self, remote: dict) -> dict:
+        details = remote.get("shortcutDetails") or {}
+        target_id = details.get("targetId")
+        if not target_id:
+            raise DriveSetupError(f"atalho sem arquivo de destino: {remote.get('name')}")
+        resource_key = details.get("targetResourceKey")
+        request = self._get_service().files().get(
+            fileId=target_id,
+            fields="id,name,mimeType,modifiedTime,md5Checksum",
+            supportsAllDrives=True,
+        )
+        target = self._execute_resource_request(request, target_id, resource_key)
+        target["name"] = remote.get("name") or target.get("name")
+        target["resourceKey"] = resource_key
+        return target
 
     def _find_remote_database(self, name: str) -> dict | None:
         self._validate_folder()
@@ -280,24 +326,45 @@ class DriveSync:
         state = self._load_state()
         downloaded = []
         for remote in self._list_files():
+            cache_id = remote["id"]
+            if remote.get("mimeType") == SHORTCUT_MIME:
+                remote = self._resolve_shortcut(remote)
             name = Path(remote.get("name", "")).name
-            if remote.get("mimeType") == FOLDER_MIME or Path(name).suffix.lower() not in SUPPORTED:
+            mime_type = remote.get("mimeType", "")
+            export = GOOGLE_EXPORTS.get(mime_type)
+            if export:
+                extension, export_mime = export
+                if Path(name).suffix.lower() != extension:
+                    name = f"{name}{extension}"
+            else:
+                export_mime = None
+            if mime_type.startswith("application/vnd.google-apps.") and not export:
+                continue
+            if Path(name).suffix.lower() not in SUPPORTED:
                 continue
 
             file_id = remote["id"]
             fingerprint = {
+                "targetId": file_id,
                 "name": name,
                 "modifiedTime": remote.get("modifiedTime"),
                 "md5Checksum": remote.get("md5Checksum"),
             }
-            target_dir = self.cache_dir / file_id
+            target_dir = self.cache_dir / cache_id
             target = target_dir / name
-            if state.get(file_id) == fingerprint and target.exists():
+            if state.get(cache_id) == fingerprint and target.exists():
+                if cache_id != file_id:
+                    state.pop(file_id, None)
                 continue
 
             target_dir.mkdir(parents=True, exist_ok=True)
             temporary = target_dir / f".{name}.part"
-            self._download(file_id, temporary)
+            self._download(
+                file_id,
+                temporary,
+                export_mime=export_mime,
+                resource_key=remote.get("resourceKey"),
+            )
             if remote.get("md5Checksum"):
                 if self._md5(temporary) != remote["md5Checksum"]:
                     temporary.unlink(missing_ok=True)
@@ -306,7 +373,9 @@ class DriveSync:
                 if old_file != temporary:
                     old_file.unlink()
             temporary.replace(target)
-            state[file_id] = fingerprint
+            state[cache_id] = fingerprint
+            if cache_id != file_id:
+                state.pop(file_id, None)
             downloaded.append(target)
 
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
