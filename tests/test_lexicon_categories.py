@@ -4,7 +4,44 @@ import pytest
 
 from ordem.detect import Detector
 from ordem.extract import Page, Source
-from ordem.lexicon import extract_poderes, extract_poderes_paranormais
+from ordem.lexicon import canonical_entries, extract_poderes, extract_poderes_paranormais
+from ordem.pipeline import current_lexicon
+
+
+def test_condition_does_not_use_incidental_path_mention_as_source():
+    source = Source(
+        path=Path("trilhas.txt"),
+        title="Homebrew",
+        sha256="test",
+        pages=[Page(1, "A habilidade deixa o alvo fraco.", "Trilhas de Especialista")],
+    )
+
+    fraco = next(
+        entry for entry in canonical_entries(source)
+        if entry.term == "Fraco" and entry.category == "condicao"
+    )
+
+    assert fraco.source_filename is None
+    assert fraco.page is None
+    assert fraco.loc is None
+
+
+def test_current_lexicon_cleans_legacy_condition_reference(monkeypatch):
+    monkeypatch.setattr(
+        "ordem.pipeline.dbmod.all_lexicon",
+        lambda _conn: [{
+            "term": "Fraco", "category": "condicao", "aliases": [], "meta": {},
+            "summary": None, "page": 8, "loc": "Trilhas de Especialista",
+            "title": "Homebrew", "filename": "trilhas.txt",
+        }],
+    )
+
+    fraco = next(entry for entry in current_lexicon(None) if entry["term"] == "Fraco")
+
+    assert fraco["title"] is None
+    assert fraco["filename"] is None
+    assert fraco["page"] is None
+    assert fraco["loc"] is None
 
 
 @pytest.mark.parametrize(

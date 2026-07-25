@@ -503,9 +503,6 @@ def canonical_entries(source: Source | None = None) -> list[LexEntry]:
             e.summary, page, loc = cond_summaries[norm]
             e.page, e.loc = page, loc
             e.source_filename = source.filename if source else None
-        elif source:
-            e.source_filename = source.filename
-            e.page, e.loc = _find_page_of(source, name)
         out.append(e)
 
     for e in RECURSOS + ATRIBUTOS + MECANICAS + TRILHAS + ARMAS:

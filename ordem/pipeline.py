@@ -57,9 +57,23 @@ def _canonical_fallback() -> list[dict]:
 def current_lexicon(conn) -> list[dict]:
     """Mescla o banco com o catálogo canônico atual sem exigir reingestão."""
     stored = dbmod.all_lexicon(conn)
+    canonical = {
+        (entry["term"], entry["category"]): entry
+        for entry in _canonical_fallback()
+    }
+    cleaned = []
+    for entry in stored:
+        fallback = canonical.get((entry["term"], entry["category"]))
+        legacy_condition = (
+            entry["category"] == "condicao"
+            and fallback is not None
+            and entry.get("summary") == fallback.get("summary")
+        )
+        cleaned.append(fallback if legacy_condition else entry)
+    stored = cleaned
     seen = {(e["term"], e["category"]) for e in stored}
     return stored + [
-        entry for entry in _canonical_fallback()
+        entry for entry in canonical.values()
         if (entry["term"], entry["category"]) not in seen
     ]
 
