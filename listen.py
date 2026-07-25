@@ -17,7 +17,14 @@ import sys
 
 CORES = {
     "ritual": "\033[95m", "pericia": "\033[96m", "condicao": "\033[91m",
-    "recurso": "\033[93m", "atributo": "\033[92m",
+    "recurso": "\033[93m", "atributo": "\033[92m", "poder": "\033[35m",
+    "caracteristica": "\033[94m", "mascara": "\033[95m",
+    "armadura": "\033[34m", "trilha": "\033[36m", "vestimenta": "\033[32m",
+    "acessorio": "\033[33m", "sinergia": "\033[95m", "bonus": "\033[92m",
+    "multiplicador": "\033[91m",
+    "classe": "\033[96m", "sobrevivente": "\033[93m", "nex": "\033[94m",
+    "perseguicao": "\033[33m", "combate": "\033[91m",
+    "efeito": "\033[95m", "dt": "\033[96m",
 }
 RESET = "\033[0m"
 
@@ -40,6 +47,8 @@ def print_event(ev) -> None:
             print(f"         ↳ {d['summary']}")
         if d.get("tier"):
             print(f"         ★ {d['tier']}: {d['tier_summary']}")
+        if d.get("details"):
+            print(f"         Regra ampliada: {d['details']}")
 
 
 def main() -> int:

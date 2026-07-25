@@ -25,6 +25,7 @@ de voz, o processamento pode ser inteiramente local.
 - `ordem/audio.py`: captura, mixagem, reamostragem e VAD.
 - `ordem/stt.py`: transcricao local com faster-whisper.
 - `ordem/pipeline.py`: orquestracao do audio ate os eventos detectados.
+- `ordem/transcripts.py`: registro opt-in em JSONL e Markdown para revisao.
 - `web/index.html`: painel web ao vivo.
 - `tests/`: testes do detector, audio, STT, Drive, colunas e glifos de dados.
 
@@ -34,10 +35,19 @@ de voz, o processamento pode ser inteiramente local.
   podem conter material protegido por direitos autorais e dados derivados.
 - Nunca versione `credentials.json`, tokens OAuth ou `.ordem-drive/`. A pasta
   do Drive e a preferencia de backup ficam apenas no config local ignorado.
+- Nunca grave transcricoes por padrao. O servidor so persiste conversas quando
+  `--transcript-log DIRETORIO` for informado; mantenha `transcripts/` ignorado.
 - Preserve o funcionamento offline e evite introduzir servicos externos no
   caminho principal.
 - O detector deve continuar tolerante a erros de transcricao em portugues,
   usando aproximacao fuzzy e fonetica.
+- Preserve as categorias expandidas: `caracteristica`, `mascara`, `armadura`,
+  `trilha`, `vestimenta`, `acessorio`, `sinergia`, `bonus` e `multiplicador`.
+  Preserve tambem `classe`, `sobrevivente`, `nex`, `perseguicao` e `combate`.
+  Preserve `efeito` e `dt`; perguntas explicativas sobre efeitos/condicoes devem
+  buscar contexto ampliado no FTS local, incluindo fonte e pagina.
+  Entradas homebrew nomeadas usam `[Categoria: Nome] - descricao`; bonus e
+  multiplicadores de dano tambem sao detectados estruturalmente na fala.
 - Preserve suporte a conteudo homebrew, inclusive elementos customizados alem
   dos cinco elementos oficiais.
 - Mantenha referencias de origem por livro e pagina, ou por fonte e secao.
@@ -77,6 +87,7 @@ python listen.py --wav sessao.wav
 python server.py --demo
 python server.py --mic
 python server.py --auto-io
+python server.py --auto-io --transcript-log transcripts
 ```
 
 Na primeira configuracao do Drive, use um cliente OAuth do tipo Desktop e
@@ -92,6 +103,8 @@ nao use `get_media` para tipos nativos `application/vnd.google-apps.*`.
 Atalhos do Drive devem ser resolvidos por `shortcutDetails.targetId`, incluindo
 `targetResourceKey`, antes de baixar ou decidir o formato de exportacao. Use o
 ID do atalho como chave do cache/estado e o ID do alvo apenas para download.
+A sincronizacao deve percorrer subpastas recursivamente, incluindo atalhos para
+pastas, com conjunto de IDs visitados para evitar ciclos.
 Um erro 404 da API ao validar a pasta normalmente significa ID incorreto ou
 conta OAuth sem acesso. Oriente a compartilhar a pasta com a conta autorizada
 ou remover `.ordem-drive/token.json` para escolher outra conta.

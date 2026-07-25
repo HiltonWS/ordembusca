@@ -174,24 +174,46 @@ class DriveSync:
         self._validate_folder()
         service = self._get_service()
         files = []
-        page_token = None
-        while True:
-            request = service.files().list(
-                q=f"'{self.folder_id}' in parents and trashed = false",
-                fields=(
-                    "nextPageToken, files(id,name,mimeType,modifiedTime,md5Checksum,"
-                    "shortcutDetails(targetId,targetMimeType,targetResourceKey))"
-                ),
-                pageToken=page_token,
-                spaces="drive",
-                supportsAllDrives=True,
-                includeItemsFromAllDrives=True,
-            )
-            response = self._execute_folder_request(request)
-            files.extend(response.get("files", []))
-            page_token = response.get("nextPageToken")
-            if not page_token:
-                return files
+        pending = [(self.folder_id, self.folder_resource_key)]
+        visited = set()
+        while pending:
+            folder_id, resource_key = pending.pop(0)
+            if folder_id in visited:
+                continue
+            visited.add(folder_id)
+            page_token = None
+            while True:
+                request = service.files().list(
+                    q=f"'{folder_id}' in parents and trashed = false",
+                    fields=(
+                        "nextPageToken, files(id,name,mimeType,modifiedTime,md5Checksum,"
+                        "resourceKey,shortcutDetails(targetId,targetMimeType,"
+                        "targetResourceKey))"
+                    ),
+                    pageToken=page_token,
+                    spaces="drive",
+                    supportsAllDrives=True,
+                    includeItemsFromAllDrives=True,
+                )
+                response = self._execute_resource_request(
+                    request, folder_id, resource_key
+                )
+                for item in response.get("files", []):
+                    if item.get("mimeType") == FOLDER_MIME:
+                        pending.append((item["id"], item.get("resourceKey")))
+                        continue
+                    details = item.get("shortcutDetails") or {}
+                    if (item.get("mimeType") == SHORTCUT_MIME
+                            and details.get("targetMimeType") == FOLDER_MIME):
+                        pending.append((
+                            details["targetId"], details.get("targetResourceKey")
+                        ))
+                        continue
+                    files.append(item)
+                page_token = response.get("nextPageToken")
+                if not page_token:
+                    break
+        return files
 
     def _download(
         self,

@@ -19,7 +19,7 @@ from .extract import Source, normalize_term
 @dataclass
 class LexEntry:
     term: str
-    category: str                       # ritual|pericia|condicao|recurso|atributo|poder
+    category: str
     aliases: list[str] = field(default_factory=list)
     meta: dict = field(default_factory=dict)
     summary: str | None = None          # resumo curto da regra
@@ -48,7 +48,13 @@ CONDICOES = [
     "Frustrado", "Imóvel", "Inconsciente", "Indefeso", "Lento", "Ofuscado",
     "Paralisado", "Pasmo", "Petrificado", "Sangrando", "Surdo", "Surpreendido",
     "Vulnerável", "Zonzo", "Enrijecido", "Machucado", "Trêmulo",
+    "Fatigado", "Enredado",
 ]
+
+CONDICAO_SUMMARY = {
+    "Fatigado": "Fica fraco e vulnerável; sofrer essa condição novamente pode causar exaustão.",
+    "Enredado": "Fica lento, vulnerável e sofre penalidade em testes de ataque.",
+}
 
 # recursos e siglas — incluem formas faladas comuns
 RECURSOS = [
@@ -86,6 +92,46 @@ ATRIBUTOS = [
              summary="Força de vontade, carisma e percepção do entorno."),
     LexEntry("Vigor", "atributo", aliases=["vig"],
              summary="Saúde, fôlego e resistência física."),
+]
+
+MECANICAS = [
+    LexEntry("Efeito", "efeito", aliases=["efeitos"],
+             summary="Consequência mecânica aplicada por uma habilidade, item ou condição."),
+    LexEntry("Classe", "classe", aliases=["classes"],
+             summary="Arquétipo principal que define habilidades e progressão do personagem."),
+    LexEntry("Combatente", "classe",
+             summary="Classe voltada a combate, resistência e domínio de armas."),
+    LexEntry("Especialista", "classe",
+             summary="Classe versátil focada em perícias, conhecimento e utilidade."),
+    LexEntry("Ocultista", "classe",
+             summary="Classe que usa rituais e conhecimento paranormal."),
+    LexEntry("Sobrevivente", "sobrevivente", aliases=["classe sobrevivente"],
+             summary="Personagem em estágio inicial de exposição e sobrevivência ao paranormal."),
+    LexEntry("Alteração de NEX", "nex",
+             aliases=["mudança de NEX", "aumento de NEX", "marco de NEX"],
+             summary="Mudança de exposição que pode liberar ou alterar habilidades."),
+    LexEntry("Perseguição", "perseguicao", aliases=["cena de perseguição"],
+             summary="Mecânica de disputa por rodadas para alcançar ou escapar de um alvo."),
+    LexEntry("Combate", "combate", aliases=["cena de combate"],
+             summary="Mecânica estruturada em rodadas, turnos, ações, ataques e reações."),
+    LexEntry("Característica Única", "caracteristica",
+             aliases=["caracteristica unica", "habilidade unica"],
+             summary="Mecânica exclusiva do personagem, com vantagens e limitações próprias."),
+    LexEntry("Habilidade de Máscara", "mascara",
+             aliases=["habilidade da mascara", "poder de mascara", "máscara"],
+             summary="Habilidade vinculada a uma máscara ou identidade especial."),
+    LexEntry("Armadura", "armadura", aliases=["proteção", "protecao"],
+             summary="Proteção equipada que pode fornecer Defesa, resistência ou efeitos."),
+    LexEntry("Trilha", "trilha", aliases=["trilha de classe"],
+             summary="Especialização de classe que concede habilidades em marcos de NEX."),
+    LexEntry("Vestimenta", "vestimenta", aliases=["veste"],
+             summary="Acessório vestido que fornece bônus ou propriedades especiais."),
+    LexEntry("Acessório", "acessorio", aliases=["acessório", "utensílio", "utensilio"],
+             summary="Item utilitário que auxilia perícias ou concede outros benefícios."),
+    LexEntry("Combinação", "sinergia", aliases=["combo", "combinação"],
+             summary="Interação planejada entre duas ou mais mecânicas."),
+    LexEntry("Sinergia", "sinergia", aliases=["sinergias"],
+             summary="Efeito conjunto em que mecânicas reforçam umas às outras."),
 ]
 
 # resumos curados das perícias (curtos e estáveis; o livro descreve em detalhe)
@@ -375,7 +421,7 @@ def canonical_entries(source: Source | None = None) -> list[LexEntry]:
         out.append(e)
 
     for name in CONDICOES:
-        e = LexEntry(name, "condicao")
+        e = LexEntry(name, "condicao", summary=CONDICAO_SUMMARY.get(name))
         norm = normalize_term(name)
         if norm in cond_summaries:
             e.summary, page, loc = cond_summaries[norm]
@@ -386,7 +432,7 @@ def canonical_entries(source: Source | None = None) -> list[LexEntry]:
             e.page, e.loc = _find_page_of(source, name)
         out.append(e)
 
-    for e in RECURSOS + ATRIBUTOS:
+    for e in RECURSOS + ATRIBUTOS + MECANICAS:
         out.append(e)
     return out
 
@@ -455,6 +501,38 @@ def build_lexicon(source: Source) -> list[LexEntry]:
 
 # poderes/habilidades nomeados no formato "[Nome] - descrição" (homebrew, fichas)
 _PODER = re.compile(r"^\[([^\]]{2,50})\]\s*[-–—:]\s*(.+)")
+_NAMED_LABEL = re.compile(r"^(.{2,30}?)\s*[:\-–—]\s*(.{2,50})$")
+_NAMED_CATEGORIES = {
+    "efeito": "efeito",
+    "classe": "classe",
+    "sobrevivente": "sobrevivente",
+    "alteracao de nex": "nex",
+    "marco de nex": "nex",
+    "perseguicao": "perseguicao",
+    "combate": "combate",
+    "caracteristica": "caracteristica",
+    "caracteristica unica": "caracteristica",
+    "habilidade unica": "caracteristica",
+    "mascara": "mascara",
+    "habilidade de mascara": "mascara",
+    "armadura": "armadura",
+    "trilha": "trilha",
+    "vestimenta": "vestimenta",
+    "acessorio": "acessorio",
+    "combinacao": "sinergia",
+    "combo": "sinergia",
+    "sinergia": "sinergia",
+}
+
+
+def _named_category(raw_name: str) -> tuple[str, str]:
+    match = _NAMED_LABEL.match(raw_name)
+    if not match:
+        return raw_name, "poder"
+    category = _NAMED_CATEGORIES.get(normalize_term(match.group(1)))
+    if not category:
+        return raw_name, "poder"
+    return match.group(2).strip(), category
 
 
 def extract_poderes(source: Source) -> list[LexEntry]:
@@ -465,7 +543,7 @@ def extract_poderes(source: Source) -> list[LexEntry]:
             m = _PODER.match(line.strip())
             if not m:
                 continue
-            nome = m.group(1).strip()
+            nome, category = _named_category(m.group(1).strip())
             # ignora rótulos puramente numéricos como [110%]
             if not re.search(r"[A-Za-zÀ-ú]", nome):
                 continue
@@ -475,7 +553,7 @@ def extract_poderes(source: Source) -> list[LexEntry]:
             seen.add(key)
             desc = re.sub(r"\s+", " ", m.group(2)).strip()
             entries.append(LexEntry(
-                term=nome, category="poder",
+                term=nome, category=category,
                 summary=_trim(desc, 300),
                 source_filename=source.filename, page=page.number,
                 loc=page.loc,

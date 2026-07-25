@@ -110,6 +110,8 @@ mesma pasta. O banco só é enviado quando seu checksum muda. Use
 `--drive-interval 60` para mudar o intervalo, `--drive-interval 0` para executar
 uma vez ou `--no-drive-db-backup` para desativar e salvar essa preferência.
 Os downloads permanecem no cache local `.ordem-drive/`.
+Todas as subpastas são percorridas recursivamente, inclusive atalhos que apontam
+para outras pastas acessíveis pela conta autorizada.
 
 Arquivos nativos do Google também são tratados: Google Docs é exportado para
 DOCX e Google Slides para PDF antes da ingestão. Planilhas e outros formatos
@@ -213,6 +215,19 @@ python server.py --demo                # sem áudio: só o painel + teste por te
 python server.py --demo --reload       # hot reload no navegador/servidor durante desenvolvimento
 ```
 
+O servidor não grava conversas por padrão. Para criar material de revisão e
+preparação de dataset, habilite explicitamente um diretório:
+
+```bash
+python server.py --devices 1 5 --transcript-log transcripts
+```
+
+Cada execução cria uma sessão `.jsonl` com texto, origem, tempos, mecânicas e
+status de revisão, além de um `.md` com caixas para marcar erros e preencher a
+correção sugerida. Eventos de áudio são marcados como `audio` e textos enviados
+pelo campo do painel como `manual`. A pasta `transcripts/` é ignorada pelo Git;
+revise consentimento e privacidade antes de gravar outras pessoas.
+
 Abra **http://localhost:8000**. A página mostra, lado a lado, a transmissão
 (transcrição rolando com timestamp) e os **cards de mecânica** — cada um
 codificado pela cor do elemento do ritual (Sangue, Morte, Conhecimento,
@@ -306,6 +321,41 @@ Cada mecânica detectada traz um resumo curto da regra:
   `[Nome do Poder] - descrição`; **Poderes Paranormais** também no formato
   dos Arquivos Secretos (`Nome` + `PODER PARANORMAL <ELEMENTO>`).
 - **Perícias, recursos, atributos**: resumo curado, estável.
+
+### Mecânicas expandidas
+
+O detector também reconhece classes (Combatente, Especialista, Ocultista e
+Sobrevivente), marcos e alterações de NEX, perseguições, combate,
+características únicas, habilidades de máscara, armaduras, trilhas,
+vestimentas, acessórios, combinações e sinergias. Bônus
+numéricos e multiplicadores de dano são extraídos diretamente da fala, incluindo
+o valor e o contexto, por exemplo `fornece +5 em Furtividade` e `dano dobrado`.
+
+Para cadastrar uma mecânica homebrew nomeada com a categoria correta, use uma
+linha explícita no TXT, Markdown ou DOCX:
+
+```text
+[Característica Única: Maré Viva] - Uma vez por cena, recebe +5 em Ocultismo.
+[Classe: Investigador] - Classe homebrew voltada a pistas e investigação.
+[Sobrevivente: Improvisador] - Habilidade para personagens sobreviventes.
+[Alteração de NEX: Despertar Tardio] - Altera uma habilidade no NEX 35%.
+[Perseguição: Fuga no Porto] - Regra especial para a cena de perseguição.
+[Combate: Maré Violenta] - Regra especial usada durante o combate.
+[Habilidade de Máscara: Face do Carrasco] - Ao ativar, o dano é dobrado.
+[Armadura: Couraça Abissal] - Fornece resistência a dano 5.
+[Trilha: Navegador do Oculto] - Concede habilidades em marcos de NEX.
+[Vestimenta: Casaco de Lodo] - Fornece +5 em Furtividade.
+[Acessório: Lente Espectral] - Auxilia testes de Percepção.
+[Sinergia: Maré e Tormenta] - Combina dois efeitos durante a cena.
+```
+
+O formato anterior `[Nome] - descrição` continua sendo classificado como poder.
+
+Perguntas como `o que fatigado dá?`, `como funciona a condição sangrando?` ou
+`qual o efeito desta habilidade?` ativam uma busca mais extensa nos livros
+locais. O card mostra o resumo e até três trechos relevantes com fonte e página.
+Testes de resistência falados, como `Fortitude DT 15 para não ficar fatigado`,
+também geram um card próprio com perícia, DT e finalidade.
 
 <p align="center">
   <img src="docs/screenshots/painel-versoes.png" alt="Cards com versoes faladas" width="100%">

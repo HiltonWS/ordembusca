@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Iterator
 
 from . import db as dbmod
-from .detect import Detection, Detector
+from .detect import Detection, Detector, is_explanation_question
 
 if TYPE_CHECKING:  # só para tipagem; runtime importa sob demanda
     pass
@@ -64,8 +64,12 @@ class Pipeline:
         self.detector = Detector(lexicon)
         # vocabulário para o viés do Whisper: nomes próprios primeiro
         # (rituais/poderes, que o STT mais erra), depois o resto do sistema
-        prio = {"ritual": 0, "poder": 1, "pericia": 2, "condicao": 3,
-                "recurso": 4, "atributo": 5}
+        prio = {"ritual": 0, "poder": 1, "caracteristica": 1, "mascara": 1,
+            "trilha": 1, "classe": 1, "sobrevivente": 1, "nex": 1,
+            "armadura": 2, "vestimenta": 2, "acessorio": 2,
+            "perseguicao": 2, "combate": 2,
+            "sinergia": 2, "pericia": 3, "condicao": 4,
+            "recurso": 5, "atributo": 6}
         vocab = [e["term"] for e in sorted(
             lexicon, key=lambda e: prio.get(e["category"], 9))]
         self._stt_args = (model_size, device, compute_type)
@@ -91,15 +95,28 @@ class Pipeline:
             if not text:
                 continue
             dets = self.detector.detect(text)
+            serialized = [_detection_to_dict(d) for d in dets]
+            self._add_explanations(text, serialized)
             yield Event(
                 start_s=round(utt.start_s, 2),
                 duration_s=round(utt.duration_s, 2),
                 text=text,
-                detections=[_detection_to_dict(d) for d in dets],
+                detections=serialized,
             )
 
     def detect_text(self, text: str) -> Event:
         """Atalho para testar a detecção sem áudio (texto já transcrito)."""
         dets = self.detector.detect(text)
-        return Event(0.0, 0.0, text,
-                     [_detection_to_dict(d) for d in dets])
+        serialized = [_detection_to_dict(d) for d in dets]
+        self._add_explanations(text, serialized)
+        return Event(0.0, 0.0, text, serialized)
+
+    def _add_explanations(self, text: str, detections: list[dict]) -> None:
+        if not is_explanation_question(text):
+            return
+        for detection in detections:
+            if detection["category"] not in ("condicao", "efeito", "dt"):
+                continue
+            details = dbmod.explain_term(self.conn, detection["term"])
+            if details:
+                detection["details"] = details

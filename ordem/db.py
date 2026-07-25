@@ -12,6 +12,7 @@ vindo de transcrição de voz.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from pathlib import Path
 
@@ -191,6 +192,29 @@ def context_for_page(conn: sqlite3.Connection, filename: str,
         (filename, page, limit),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def explain_term(conn: sqlite3.Connection, term: str, limit: int = 3) -> str | None:
+    """Busca contexto ampliado local para responder perguntas sobre uma mecânica."""
+    rows = search_fts(conn, term, limit=limit)
+    if not rows:
+        return None
+    excerpts = []
+    norm = normalize_term(term)
+    for row in rows:
+        content = re.sub(r"\s+", " ", row["content"]).strip()
+        normalized = normalize_term(content)
+        position = normalized.find(norm)
+        if position >= 0:
+            ratio = position / max(len(normalized), 1)
+            center = int(ratio * len(content))
+            content = content[max(0, center - 180):center + 520].strip()
+        if len(content) > 700:
+            content = content[:697].rsplit(" ", 1)[0] + "..."
+        location = row.get("section") or (f"p.{row['page']}" if row.get("page") else "")
+        label = " · ".join(part for part in (row.get("title"), location) if part)
+        excerpts.append(f"{label}: {content}" if label else content)
+    return "\n\n".join(excerpts)
 
 
 def all_lexicon(conn: sqlite3.Connection) -> list[dict]:

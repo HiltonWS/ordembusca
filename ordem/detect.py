@@ -43,7 +43,11 @@ def phonetic_pt(s: str) -> str:
 AMBIGUOUS_FORMS = {
     "luta", "crime", "artes", "vontade", "religiao", "profissao", "ciencias",
     "forca", "presenca", "vida", "esforco", "resistencia", "dano", "vigor",
-    "luz",
+    "luz", "mascara", "armadura", "protecao", "trilha", "vestimenta",
+    "veste", "acessorio", "utensilio", "combo", "combinacao", "sinergia",
+    "classe", "combatente", "especialista", "ocultista", "sobrevivente",
+    "perseguicao", "combate",
+    "efeito",
 }
 
 # Palavras que sinalizam uso de mecânica na mesa.
@@ -55,7 +59,44 @@ TRIGGERS = {
     "gastar", "recupera", "recuperar", "perde", "perder", "sofre", "sofrer",
     "reduz", "ataque", "atacar", "ataca", "pontos", "ponto", "resistencia",
     "lanca", "lancar", "lanco", "usa", "usar", "ativa", "ativar", "ativo",
+    "habilidade", "equipa", "equipar", "veste", "vestir", "armadura",
+    "mascara", "trilha", "vestimenta", "acessorio", "utensilio", "combo",
+    "combina", "combinacao", "sinergia",
+    "classe", "combatente", "especialista", "ocultista", "sobrevivente",
+    "nex", "aumenta", "mudanca", "marco", "perseguicao", "persegue",
+    "escapa", "combate", "turno", "rodada",
+    "efeito", "condicao", "dt", "passar", "sair", "resistir",
 }
+
+_BONUS_RE = re.compile(
+    r"\b(?:b[oô]nus(?:\s+de)?|recebe|ganha|concede|fornece)\s*"
+    r"(?P<value>[+\-]\s*\d+|\d+d20)\b"
+    r"(?:\s+(?:em|no|na|nos|nas|para)\s+"
+    r"(?P<context>[^,.;]+?)(?=\s+e\s+(?:o|a|um|uma)\s+|[,.;]|$))?",
+    re.I,
+)
+_DAMAGE_MULTIPLIER_RES = [
+    re.compile(r"\b(?:o\s+)?dano\s+(?P<value>dobrado|triplicado|x\s*[2-9])\b", re.I),
+    re.compile(r"\b(?P<value>dobro|triplo)\s+(?:do\s+)?dano\b", re.I),
+    re.compile(r"\bmultiplica(?:r|do)?\s+(?:o\s+)?dano\s+por\s+(?P<value>[2-9])\b", re.I),
+]
+_NEX_CHANGE_RE = re.compile(
+    r"\bnex\b[^,.;\d]{0,30}(?P<value>\d{1,3})\s*(?:%|por\s+cento)",
+    re.I,
+)
+_DT_RE = re.compile(
+    r"(?:(?:teste\s+de\s+)?(?P<test>Fortitude|Reflexos|Vontade)\s*"
+    r"(?:\([^)]*\)\s*)?)?\bDT\s*(?P<value>\d{1,3})\b"
+    r"(?:\s+(?P<context>para\s+[^,.;]+))?",
+    re.I,
+)
+
+
+def is_explanation_question(text: str) -> bool:
+    norm = normalize_term(text)
+    prompts = ("o que", "como funciona", "qual efeito", "o que faz",
+               "o que da", "me explica", "explique", "qual a regra")
+    return any(prompt in norm for prompt in prompts)
 
 
 @dataclass
@@ -156,10 +197,71 @@ class Detector:
                         matched_text=best_span,
                     )
 
+        for detection in self._detect_structural(text):
+            found[(detection.term, detection.category)] = detection
+
         results = sorted(found.values(), key=lambda d: -d.score)
         results = self._gate_ambiguous(results, tokens)
         results = self._suppress_substrings(results)
         return self._attach_tiers(results, tokens)
+
+    @staticmethod
+    def _detect_structural(text: str) -> list[Detection]:
+        detections: list[Detection] = []
+        nex_match = _NEX_CHANGE_RE.search(text)
+        if nex_match:
+            value = int(nex_match.group("value"))
+            if 0 <= value <= 100:
+                detections.append(Detection(
+                    term=f"NEX {value}%", category="nex", score=100.0,
+                    meta={"nex": value}, summary=f"Marco ou alteração para NEX {value}%.",
+                    page=None, loc=None, source=None, matched_text=nex_match.group(0),
+                ))
+        for match in _DT_RE.finditer(text):
+            value = int(match.group("value"))
+            test = match.group("test")
+            context = (match.group("context") or "").strip()
+            summary = f"Teste de {test} contra DT {value}" if test else f"Teste contra DT {value}"
+            if context:
+                summary += f" {context}"
+            matched_text = match.group(0)
+            if context:
+                matched_text = matched_text[:-len(context)].strip()
+            detections.append(Detection(
+                term=f"DT {value}", category="dt", score=100.0,
+                meta={"dt": value, "test": test, "context": context or None},
+                summary=summary + ".", page=None, loc=None, source=None,
+                matched_text=matched_text,
+            ))
+        for match in _BONUS_RE.finditer(text):
+            value = re.sub(r"\s+", "", match.group("value"))
+            context = (match.group("context") or "").strip()
+            summary = f"Bônus {value}"
+            if context:
+                summary += f" aplicado em {context}"
+            detections.append(Detection(
+                term=f"Bônus {value}", category="bonus", score=100.0,
+                meta={"value": value, "context": context or None},
+                summary=summary, page=None, loc=None, source=None,
+                matched_text=match.group(0),
+            ))
+
+        for pattern in _DAMAGE_MULTIPLIER_RES:
+            match = pattern.search(text)
+            if not match:
+                continue
+            value = match.group("value").lower().replace(" ", "")
+            labels = {"2": "dobro", "3": "triplo", "dobrado": "dobro",
+                      "triplicado": "triplo", "x2": "dobro", "x3": "triplo"}
+            label = labels.get(value, value)
+            detections.append(Detection(
+                term=f"Dano {label}", category="multiplicador", score=100.0,
+                meta={"multiplier": label},
+                summary=f"Multiplicador de dano: {label}.",
+                page=None, loc=None, source=None, matched_text=match.group(0),
+            ))
+            break
+        return detections
 
     # palavras faladas -> chave do aprimoramento no meta
     _TIER_WORDS = {

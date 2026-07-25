@@ -14,7 +14,12 @@
     --sangue:#c0202e; --morte:#3f9b6a; --conhecimento:#d4a72c;
     --energia:#8664d6; --medo:#cfd2d8; --profundezas:#1f7a8c;
     --pericia:#4fa3bd; --condicao:#d4703a; --recurso:#54b3a2; --atributo:#8bbf63;
-    --poder:#c78ab0;
+    --poder:#c78ab0; --caracteristica:#5891c7; --mascara:#b27ab8;
+    --armadura:#5876a3; --trilha:#4e9aa3; --vestimenta:#70a56d;
+    --acessorio:#c39a4e; --sinergia:#a875b5; --bonus:#65a96d; --multiplicador:#c65b55;
+    --classe:#4d91a8; --sobrevivente:#b08b45; --nex:#557fbd;
+    --perseguicao:#b17d45; --combate:#b85353;
+    --efeito:#9a6baa; --dt:#4d9ca8;
     --glow:rgba(192,32,46,.14);
   }
   *{box-sizing:border-box}
@@ -148,10 +153,24 @@
 const ELEM = {Sangue:'--sangue',Morte:'--morte',Conhecimento:'--conhecimento',
               Energia:'--energia',Medo:'--medo',Profundezas:'--profundezas'};
 const CAT = {ritual:'--energia',pericia:'--pericia',condicao:'--condicao',
-             recurso:'--recurso',atributo:'--atributo',poder:'--poder'};
+             recurso:'--recurso',atributo:'--atributo',poder:'--poder',
+             caracteristica:'--caracteristica',mascara:'--mascara',
+             armadura:'--armadura',trilha:'--trilha',vestimenta:'--vestimenta',
+             acessorio:'--acessorio',sinergia:'--sinergia',bonus:'--bonus',
+             multiplicador:'--multiplicador',classe:'--classe',
+             sobrevivente:'--sobrevivente',nex:'--nex',
+             perseguicao:'--perseguicao',combate:'--combate',
+             efeito:'--efeito',dt:'--dt'};
 const CIRC = {1:'1º',2:'2º',3:'3º',4:'4º'};
 const CATLABEL = {ritual:'ritual',pericia:'perícia',condicao:'condição',
-                  recurso:'recurso',atributo:'atributo',poder:'poder'};
+                  recurso:'recurso',atributo:'atributo',poder:'poder',
+                  caracteristica:'característica única',mascara:'máscara',
+                  armadura:'armadura',trilha:'trilha',vestimenta:'vestimenta',
+                  acessorio:'acessório',sinergia:'sinergia',bonus:'bônus',
+                  multiplicador:'multiplicador de dano',classe:'classe',
+                  sobrevivente:'sobrevivente',nex:'alteração de NEX',
+                  perseguicao:'perseguição',combate:'combate',
+                  efeito:'efeito',dt:'teste de resistência'};
 const cards = document.getElementById('cards');
 const feed  = document.getElementById('feed');
 const cardsScroll = document.getElementById('cards-scroll');
@@ -209,6 +228,7 @@ function addCard(d){
      <div class="eyebrow">${eyebrow}</div>
      <h3>${escapeHtml(d.term)} ${badge} ${tierBadge}</h3>
      ${d.summary?`<p class="sum">${escapeHtml(d.summary)}</p>`:''}
+    ${d.details?`<p class="sum">${escapeHtml(d.details)}</p>`:''}
      ${tierBlock}
      <div class="ref">${ref}</div>`;
   cards.appendChild(el);

@@ -12,7 +12,7 @@ import argparse
 import sys
 
 from ordem import db as dbmod
-from ordem.detect import Detector, format_ref
+from ordem.detect import Detector, format_ref, is_explanation_question
 
 
 def main() -> int:
@@ -50,6 +50,10 @@ def main() -> int:
             print(f"    ↳ {d.summary}")
         if d.tier:
             print(f"    ★ {d.tier}: {d.tier_summary}")
+        if is_explanation_question(args.texto):
+            details = dbmod.explain_term(conn, d.term)
+            if details:
+                print(f"    Regra ampliada:\n{details}")
         print()
     return 0
 

@@ -107,6 +107,57 @@ def test_validate_folder_explains_missing_access():
         sync._validate_folder()
 
 
+def test_list_files_recurses_into_subfolders_and_folder_shortcuts():
+    folder_mime = "application/vnd.google-apps.folder"
+    shortcut_mime = "application/vnd.google-apps.shortcut"
+    contents = {
+        "root": [
+            {"id": "root-file", "name": "Raiz.pdf", "mimeType": "application/pdf"},
+            {"id": "child", "name": "Livros", "mimeType": folder_mime},
+            {
+                "id": "folder-link",
+                "name": "Homebrews",
+                "mimeType": shortcut_mime,
+                "shortcutDetails": {
+                    "targetId": "linked-folder",
+                    "targetMimeType": folder_mime,
+                    "targetResourceKey": "linked-key",
+                },
+            },
+        ],
+        "child": [
+            {"id": "child-file", "name": "Livro.pdf", "mimeType": "application/pdf"}
+        ],
+        "linked-folder": [
+            {"id": "linked-file", "name": "Casa.docx", "mimeType": "application/docx"}
+        ],
+    }
+
+    class Request:
+        def __init__(self, response):
+            self.response = response
+            self.headers = {}
+
+        def execute(self):
+            return self.response
+
+    class Files:
+        def list(self, q, **kwargs):
+            folder_id = q.split("'")[1]
+            return Request({"files": contents[folder_id]})
+
+    class Service:
+        def files(self):
+            return Files()
+
+    sync = DriveSync("root", service=Service())
+    sync._folder_validated = True
+
+    assert [item["id"] for item in sync._list_files()] == [
+        "root-file", "child-file", "linked-file"
+    ]
+
+
 def test_drive_config_remembers_folder_and_database_preference(tmp_path):
     config_path = tmp_path / "config.json"
     folder = "https://drive.google.com/drive/folders/abc_123"

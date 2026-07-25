@@ -99,6 +99,21 @@ HOMEBREW = [
     ("ativo minha Mutação e ganho resistência a dano", {"Mutação"}),
 ]
 
+MECANICAS_EXPANDIDAS = [
+    ("minha classe é combatente", {"Classe", "Combatente"}),
+    ("o especialista usa uma habilidade", {"Especialista"}),
+    ("o ocultista aumenta o NEX", {"Ocultista"}),
+    ("a sobrevivente entra na cena", {"Sobrevivente"}),
+    ("começa uma perseguição por rodadas", {"Perseguição"}),
+    ("entramos em combate e rola iniciativa", {"Combate"}),
+    ("ativo minha característica única", {"Característica Única"}),
+    ("uso a habilidade de máscara do personagem", {"Habilidade de Máscara"}),
+    ("equipo a armadura e uma vestimenta aprimorada", {"Armadura", "Vestimenta"}),
+    ("minha trilha concede este poder", {"Trilha"}),
+    ("uso um acessório nesse teste", {"Acessório"}),
+    ("esse combo cria sinergia com o ritual", {"Combinação", "Sinergia"}),
+]
+
 # ------------------------------------------------------------- negativos
 AMBIGUOS_SEM_GATILHO = [
     "a luta na rua foi violenta",
@@ -152,6 +167,44 @@ def test_ambiguos_com_gatilho_detectam(detector, text, expected):
 @pytest.mark.parametrize("text,expected", HOMEBREW)
 def test_poderes_homebrew(detector, text, expected):
     assert expected <= terms_of(detector, text)
+
+
+@pytest.mark.parametrize("text,expected", MECANICAS_EXPANDIDAS)
+def test_mecanicas_expandidas(detector, text, expected):
+    assert expected <= terms_of(detector, text)
+
+
+def test_bonus_e_multiplicador_preservam_valores(detector):
+    detections = detector.detect(
+        "a vestimenta fornece +5 em Furtividade e o ataque causa dano dobrado"
+    )
+    found = {(d.category, d.term): d for d in detections}
+    assert found[("bonus", "Bônus +5")].meta["context"] == "Furtividade"
+    assert found[("multiplicador", "Dano dobro")].meta["multiplier"] == "dobro"
+
+
+def test_dobro_de_pe_nao_e_multiplicador_de_dano(detector):
+    assert not any(
+        d.category == "multiplicador"
+        for d in detector.detect("conjurar custa o dobro de PE")
+    )
+
+
+def test_alteracao_de_nex_preserva_percentual(detector):
+    detections = detector.detect("o personagem aumenta o NEX para 35%")
+    found = {(d.category, d.term): d for d in detections}
+    assert found[("nex", "NEX 35%")].meta["nex"] == 35
+
+
+def test_condicao_e_dt_de_resistencia(detector):
+    detections = detector.detect("faz Fortitude DT 15 para não ficar fatigado")
+    found = {(d.category, d.term): d for d in detections}
+    assert found[("condicao", "Fatigado")].summary
+    assert found[("dt", "DT 15")].meta == {
+        "dt": 15,
+        "test": "Fortitude",
+        "context": "para não ficar fatigado",
+    }
 
 
 @pytest.mark.parametrize("text", AMBIGUOS_SEM_GATILHO)

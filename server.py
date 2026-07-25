@@ -41,6 +41,7 @@ _loop: asyncio.AbstractEventLoop | None = None
 _config: dict = {}
 _pipeline = None            # criado lazy (evita carregar Whisper em demo)
 _history: collections.deque[dict] = collections.deque(maxlen=4000)
+_transcript_store = None
 
 
 def _load_config_from_env() -> None:
@@ -76,6 +77,8 @@ def get_pipeline():
 
 
 async def _broadcast(event: dict) -> None:
+    if _transcript_store is not None and event.get("type") == "event":
+        _transcript_store.append(event, event.get("origin", "unknown"))
     _history.append(event)
     dead = []
     for ws in _clients:
@@ -120,14 +123,19 @@ def _audio_worker() -> None:
     pipe = get_pipeline()
     for ev in pipe.run(frames, aggressiveness=_config.get("aggressiveness", 2),
                        padding_ms=_config.get("padding_ms", 550)):
-        _emit_from_thread({"type": "event", **ev.to_json()})
+        _emit_from_thread({"type": "event", "origin": "audio", **ev.to_json()})
     _emit_from_thread({"type": "end"})
 
 
 @app.on_event("startup")
 async def _startup() -> None:
-    global _loop
+    global _loop, _transcript_store
     _loop = asyncio.get_running_loop()
+    transcript_log = _config.get("transcript_log")
+    if transcript_log and _transcript_store is None:
+        from ordem.transcripts import TranscriptStore
+        _transcript_store = TranscriptStore(transcript_log)
+        print(f"Transcrições: {_transcript_store.markdown_path}")
     if _config.get("source") in ("mic", "wav", "devices"):
         threading.Thread(target=_audio_worker, daemon=True).start()
 
@@ -140,14 +148,14 @@ async def index() -> str:
 @app.get("/health")
 async def health() -> dict:
     return {"ok": True, "version": APP_VERSION, "source": _config.get("source"),
-            "clients": len(_clients)}
+            "clients": len(_clients), "transcript_log": _transcript_store is not None}
 
 
 @app.post("/simulate")
 async def simulate(inp: SimulateIn) -> dict:
     """Detecta mecânicas num texto e transmite como evento (teste sem áudio)."""
     ev = get_pipeline().detect_text(inp.text)
-    await _broadcast({"type": "event", **ev.to_json()})
+    await _broadcast({"type": "event", "origin": "manual", **ev.to_json()})
     return {"detections": len(ev.detections)}
 
 
@@ -184,6 +192,8 @@ def main() -> int:
     ap.add_argument("--aggressiveness", type=int, default=2)
     ap.add_argument("--padding-ms", type=int, default=550,
                     help="silêncio (ms) para fechar uma fala; maior = falas mais completas")
+    ap.add_argument("--transcript-log", metavar="DIRETORIO",
+                    help="salva JSONL e Markdown para revisão (desativado por padrão)")
     ap.add_argument("--reload", action="store_true",
                     help="recarrega o servidor quando arquivos .py/.html mudarem")
     ap.add_argument("--host", default="0.0.0.0")
@@ -197,6 +207,7 @@ def main() -> int:
         wav=args.wav, db=args.db, model=args.model, device=args.device,
         compute=args.compute, mic_device=args.mic_device,
         aggressiveness=args.aggressiveness, padding_ms=args.padding_ms,
+        transcript_log=args.transcript_log,
     )
 
     os.environ[ENV_CONFIG] = json.dumps(_config, ensure_ascii=False)
