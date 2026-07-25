@@ -7,6 +7,9 @@
 uploads/
 livros/
 .ordem-drive/
+.ordem-thumbnails/
+tokens/
+extras/
 credentials.json
 client_secret*.json
 

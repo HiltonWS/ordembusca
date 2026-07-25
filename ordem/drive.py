@@ -13,6 +13,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.file",
 ]
 SUPPORTED = {".pdf", ".txt", ".md", ".docx"}
+IMAGE_SUPPORTED = {".png", ".jpg", ".jpeg", ".webp"}
+DOWNLOAD_SUPPORTED = SUPPORTED | IMAGE_SUPPORTED
 FOLDER_MIME = "application/vnd.google-apps.folder"
 SHORTCUT_MIME = "application/vnd.google-apps.shortcut"
 DEFAULT_CONFIG_PATH = Path(".ordem-drive/config.json")
@@ -362,7 +364,7 @@ class DriveSync:
                 export_mime = None
             if mime_type.startswith("application/vnd.google-apps.") and not export:
                 continue
-            if Path(name).suffix.lower() not in SUPPORTED:
+            if Path(name).suffix.lower() not in DOWNLOAD_SUPPORTED:
                 continue
 
             file_id = remote["id"]

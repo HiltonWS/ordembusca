@@ -137,7 +137,11 @@ def main() -> int:
                 downloaded = sync.sync_once()
                 if downloaded:
                     print(f"\nDrive: {len(downloaded)} arquivo(s) novo(s) ou alterado(s)")
-                    ingest_paths(conn, downloaded, force=args.force)
+                    ingest_paths(
+                        conn,
+                        [path for path in downloaded if path.suffix.lower() in SUPPORTED],
+                        force=args.force,
+                    )
                 else:
                     print("\nDrive: nenhuma alteração")
                 if database_backup:

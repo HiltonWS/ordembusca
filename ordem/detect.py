@@ -48,6 +48,8 @@ AMBIGUOUS_FORMS = {
     "classe", "combatente", "especialista", "ocultista", "sobrevivente",
     "perseguicao", "combate",
     "efeito",
+    "guerreiro", "faca", "lanca", "corrente", "arco", "martelo",
+    "item", "idade",
 }
 
 # Palavras que sinalizam uso de mecânica na mesa.
@@ -66,6 +68,14 @@ TRIGGERS = {
     "nex", "aumenta", "mudanca", "marco", "perseguicao", "persegue",
     "escapa", "combate", "turno", "rodada",
     "efeito", "condicao", "dt", "passar", "sair", "resistir",
+    "versatilidade", "arma", "armas", "empunha", "empunhar", "golpe",
+    "dispara", "disparar", "tiro", "municao",
+}
+
+_AMBIGUOUS_WEAPONS = {"faca", "lanca", "corrente", "arco", "martelo"}
+_WEAPON_TRIGGERS = {
+    "arma", "armas", "ataque", "atacar", "ataca", "dano", "equipa", "equipar",
+    "empunha", "empunhar", "golpe", "dispara", "disparar", "tiro", "municao",
 }
 
 _BONUS_RE = re.compile(
@@ -90,6 +100,21 @@ _DT_RE = re.compile(
     r"(?:\s+(?P<context>para\s+[^,.;]+))?",
     re.I,
 )
+_AGE_RE = re.compile(r"\b(?:idade\s*(?:de|é|e)?\s*)?(?P<value>\d{1,3})\s*anos\b", re.I)
+
+
+def _age_band(age: int) -> str:
+    if age <= 12:
+        return "Criança"
+    if age <= 17:
+        return "Adolescente"
+    if age <= 24:
+        return "Jovem"
+    if age <= 44:
+        return "Adulto"
+    if age <= 64:
+        return "Maduro"
+    return "Idoso"
 
 
 def is_explanation_question(text: str) -> bool:
@@ -201,9 +226,41 @@ class Detector:
             found[(detection.term, detection.category)] = detection
 
         results = sorted(found.values(), key=lambda d: -d.score)
+        weapons = [d for d in results if d.category == "arma"]
+        results = [d for d in results if d.category != "arma"]
         results = self._gate_ambiguous(results, tokens)
+        has_weapon_trigger = bool(set(tokens) & _WEAPON_TRIGGERS)
+        results.extend(
+            detection for detection in weapons
+            if not self._weapon_false_positive(detection, tokens, has_weapon_trigger)
+        )
         results = self._suppress_substrings(results)
-        return self._attach_tiers(results, tokens)
+        results = self._attach_tiers(results, tokens)
+        return self._attach_track_context(results, tokens)
+
+    @staticmethod
+    def _weapon_false_positive(
+        detection: Detection, tokens: list[str], has_weapon_trigger: bool
+    ) -> bool:
+        term = normalize_term(detection.term)
+        if term not in _AMBIGUOUS_WEAPONS or has_weapon_trigger or len(tokens) == 1:
+            return False
+        if term == "faca" and "teste" in tokens:
+            return True
+        if term == "lanca" and any(token in tokens for token in ("ritual", "conjura")):
+            return True
+        return False
+
+    @staticmethod
+    def _attach_track_context(dets: list[Detection], tokens: list[str]) -> list[Detection]:
+        if "versatilidade" not in tokens:
+            return dets
+        marker = tokens.index("versatilidade")
+        tail = set(tokens[marker + 1:])
+        for detection in dets:
+            if detection.category == "trilha" and normalize_term(detection.term) in " ".join(tail):
+                detection.meta = {**detection.meta, "selection": "versatilidade"}
+        return dets
 
     @staticmethod
     def _detect_structural(text: str) -> list[Detection]:
@@ -216,6 +273,17 @@ class Detector:
                     term=f"NEX {value}%", category="nex", score=100.0,
                     meta={"nex": value}, summary=f"Marco ou alteração para NEX {value}%.",
                     page=None, loc=None, source=None, matched_text=nex_match.group(0),
+                ))
+        age_match = _AGE_RE.search(text)
+        if age_match:
+            age = int(age_match.group("value"))
+            if 1 <= age <= 150:
+                band = _age_band(age)
+                detections.append(Detection(
+                    term=f"Idade {age} anos", category="idade", score=100.0,
+                    meta={"age": age, "band": band},
+                    summary=f"Faixa etária: {band}.", page=None, loc=None,
+                    source=None, matched_text=age_match.group(0),
                 ))
         for match in _DT_RE.finditer(text):
             value = int(match.group("value"))
@@ -296,13 +364,15 @@ class Detector:
     def _gate_ambiguous(dets: list[Detection], tokens: list[str]) -> list[Detection]:
         """Termo que também é palavra comum só conta com um gatilho de jogo."""
         has_trigger = any(t in TRIGGERS for t in tokens)
-        if has_trigger:
-            return dets
         kept = []
         for d in dets:
+            if d.term == "Regra de Idade" and not any(
+                token in tokens for token in ("idade", "etaria", "etario")
+            ):
+                continue
             amb = (d.matched_text in AMBIGUOUS_FORMS
                    or normalize_term(d.term) in AMBIGUOUS_FORMS)
-            if amb:
+            if amb and not has_trigger:
                 continue
             kept.append(d)
         return kept

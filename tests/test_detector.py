@@ -207,6 +207,66 @@ def test_condicao_e_dt_de_resistencia(detector):
     }
 
 
+def test_classe_trilhas_e_versatilidade(detector):
+    detections = detector.detect(
+        "combatente aniquilador com versatilidade em guerreiro"
+    )
+    found = {(d.category, d.term): d for d in detections}
+    assert ("classe", "Combatente") in found
+    assert found[("trilha", "Aniquilador")].meta["classe"] == "Combatente"
+    assert found[("trilha", "Guerreiro")].meta == {
+        "classe": "Combatente",
+        "selection": "versatilidade",
+    }
+
+
+def test_lamina_e_porcentagem_de_nex(detector):
+    detections = detector.detect("ocultista lâmina com NEX 50%")
+    found = {(d.category, d.term): d for d in detections}
+    assert found[("trilha", "Lâmina Paranormal")].meta["classe"] == "Ocultista"
+    assert found[("nex", "NEX 50%")].meta["nex"] == 50
+
+
+@pytest.mark.parametrize(
+    "age,band",
+    [(12, "Criança"), (17, "Adolescente"), (24, "Jovem"),
+     (44, "Adulto"), (64, "Maduro"), (65, "Idoso")],
+)
+def test_regra_de_idade(detector, age, band):
+    detection = next(
+        item for item in detector.detect(f"personagem com idade de {age} anos")
+        if item.category == "idade" and item.term == f"Idade {age} anos"
+    )
+    assert detection.meta == {"age": age, "band": band}
+
+
+def test_idade_em_fala_natural(detector):
+    detection = next(
+        item for item in detector.detect("meu personagem tem 47 anos")
+        if item.category == "idade"
+    )
+    assert detection.term == "Idade 47 anos"
+    assert detection.meta["band"] == "Maduro"
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("eu ataco com minha espada", "Espada"),
+        ("disparo o rifle de precisão", "Rifle de Precisão"),
+        ("equipo uma submetralhadora", "Submetralhadora"),
+        ("ataco com a faca", "Faca"),
+    ],
+)
+def test_nomes_de_armas(detector, text, expected):
+    assert expected in terms_of(detector, text)
+
+
+def test_faca_e_lanca_nao_confundem_com_verbos(detector):
+    assert "Faca" not in terms_of(detector, "faça um teste de investigação")
+    assert "Lança" not in terms_of(detector, "lança um ritual de energia")
+
+
 @pytest.mark.parametrize("text", AMBIGUOS_SEM_GATILHO)
 def test_ambiguos_sem_gatilho_nao_detectam(detector, text):
     assert terms_of(detector, text) == set()

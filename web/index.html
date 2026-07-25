@@ -15,7 +15,8 @@
     --energia:#8664d6; --medo:#cfd2d8; --profundezas:#1f7a8c;
     --pericia:#4fa3bd; --condicao:#d4703a; --recurso:#54b3a2; --atributo:#8bbf63;
     --poder:#c78ab0; --caracteristica:#5891c7; --mascara:#b27ab8;
-    --armadura:#5876a3; --trilha:#4e9aa3; --vestimenta:#70a56d;
+    --armadura:#5876a3; --arma:#a85f55; --item:#a98b59; --idade:#6597a5;
+    --trilha:#4e9aa3; --vestimenta:#70a56d;
     --acessorio:#c39a4e; --sinergia:#a875b5; --bonus:#65a96d; --multiplicador:#c65b55;
     --classe:#4d91a8; --sobrevivente:#b08b45; --nex:#557fbd;
     --perseguicao:#b17d45; --combate:#b85353;
@@ -59,6 +60,12 @@
     display:flex;align-items:center;gap:10px;
   }
   .col-head::after{content:"";flex:1;height:1px;background:var(--line)}
+  .tabs{display:flex;gap:2px;margin-left:auto}
+  .tab{border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);
+    padding:5px 8px;font-family:'Oswald',sans-serif;text-transform:uppercase;
+    letter-spacing:.12em;font-size:10px;cursor:pointer}
+  .tab.active{color:var(--ink);border-color:var(--sangue)}
+  .view.hidden{display:none}
   .scroll{flex:1;min-width:0;overflow-y:auto;padding:4px 22px 22px;scrollbar-width:thin;
     scrollbar-color:var(--line) transparent}
   .scroll::-webkit-scrollbar{width:8px}
@@ -75,6 +82,9 @@
     position:relative;background:linear-gradient(180deg,var(--panel-2),var(--panel));
     border:1px solid var(--line);border-left:4px solid var(--accent,#555);
     border-radius:3px;padding:14px 16px 15px;animation:cardin .45s cubic-bezier(.2,.7,.3,1)}
+  .card.has-thumb{padding-right:132px;min-height:128px}
+  .thumb{position:absolute;right:14px;top:14px;width:102px;height:102px;
+    object-fit:cover;border:1px solid var(--line);border-radius:3px;background:var(--void)}
   @keyframes cardin{from{opacity:0;transform:translateX(10px)}to{opacity:1}}
   .card .eyebrow{font-family:'Oswald',sans-serif;text-transform:uppercase;
     letter-spacing:.2em;font-size:10px;color:var(--accent,#999);
@@ -97,6 +107,17 @@
   .card .ref b{color:#b5ac9c;font-weight:500}
   .count{position:absolute;top:12px;right:14px;font-family:'JetBrains Mono',monospace;
     font-size:11px;color:var(--accent,#999);opacity:.9}
+  .story{display:flex;flex-direction:column;gap:0;border-left:1px solid var(--line);margin-left:7px}
+  .scene{position:relative;padding:0 0 22px 24px}
+  .scene::before{content:"";position:absolute;left:-5px;top:7px;width:9px;height:9px;
+    border-radius:50%;background:var(--sangue);box-shadow:0 0 8px var(--glow)}
+  .scene .time{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)}
+  .scene h3{font-family:'Oswald',sans-serif;font-size:17px;margin:4px 0 5px;letter-spacing:0}
+  .scene p{font-size:13px;line-height:1.5;color:#cfc9bc;margin:0}
+  .scene img{width:100%;max-height:220px;object-fit:cover;margin:9px 0 0;
+    border:1px solid var(--line);border-radius:3px}
+  .scene .mechanics{font-family:'JetBrains Mono',monospace;font-size:10px;
+    color:var(--muted);margin-top:7px}
   /* empty state ----------------------------------------------------------*/
   .empty{color:var(--muted);font-size:13px;line-height:1.6;padding:8px 0}
   .empty code{font-family:'JetBrains Mono',monospace;color:#b5ac9c;
@@ -115,6 +136,7 @@
   @media(max-width:820px){
     main{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) minmax(0,1fr)}
     .col.feed{border-right:none;border-bottom:1px solid var(--line)}
+    .card.has-thumb{padding-right:112px}.thumb{width:82px;height:82px}
   }
   @media(prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
@@ -132,14 +154,22 @@
       </div>
     </section>
     <section class="col">
-      <div class="col-head">Mecânicas em Uso</div>
-      <div class="scroll" id="cards-scroll">
+      <div class="col-head">Sessão
+        <div class="tabs">
+          <button class="tab active" data-view="mechanics">Mecânicas</button>
+          <button class="tab" data-view="story">História</button>
+        </div>
+      </div>
+      <div class="scroll view" id="mechanics-view">
         <div class="cards" id="cards">
           <div class="empty" id="cards-empty">
             Nenhuma mecânica ainda. Fale (ou digite abaixo) algo como
             <code>conjura Sopro do Caos e faz teste de Ocultismo</code>.
           </div>
         </div>
+      </div>
+      <div class="scroll view hidden" id="story-view">
+        <div class="story" id="story"></div>
       </div>
     </section>
   </main>
@@ -155,7 +185,8 @@ const ELEM = {Sangue:'--sangue',Morte:'--morte',Conhecimento:'--conhecimento',
 const CAT = {ritual:'--energia',pericia:'--pericia',condicao:'--condicao',
              recurso:'--recurso',atributo:'--atributo',poder:'--poder',
              caracteristica:'--caracteristica',mascara:'--mascara',
-             armadura:'--armadura',trilha:'--trilha',vestimenta:'--vestimenta',
+             armadura:'--armadura',arma:'--arma',item:'--item',idade:'--idade',
+             trilha:'--trilha',vestimenta:'--vestimenta',
              acessorio:'--acessorio',sinergia:'--sinergia',bonus:'--bonus',
              multiplicador:'--multiplicador',classe:'--classe',
              sobrevivente:'--sobrevivente',nex:'--nex',
@@ -165,7 +196,8 @@ const CIRC = {1:'1º',2:'2º',3:'3º',4:'4º'};
 const CATLABEL = {ritual:'ritual',pericia:'perícia',condicao:'condição',
                   recurso:'recurso',atributo:'atributo',poder:'poder',
                   caracteristica:'característica única',mascara:'máscara',
-                  armadura:'armadura',trilha:'trilha',vestimenta:'vestimenta',
+                  armadura:'armadura',arma:'arma',item:'item',idade:'regra de idade',
+                  trilha:'trilha',vestimenta:'vestimenta',
                   acessorio:'acessório',sinergia:'sinergia',bonus:'bônus',
                   multiplicador:'multiplicador de dano',classe:'classe',
                   sobrevivente:'sobrevivente',nex:'alteração de NEX',
@@ -173,7 +205,8 @@ const CATLABEL = {ritual:'ritual',pericia:'perícia',condicao:'condição',
                   efeito:'efeito',dt:'teste de resistência'};
 const cards = document.getElementById('cards');
 const feed  = document.getElementById('feed');
-const cardsScroll = document.getElementById('cards-scroll');
+const cardsScroll = document.getElementById('mechanics-view');
+const story=document.getElementById('story');
 const recent = [];  // termos recentes p/ agrupar repetições
 
 function autoscrollToBottom(el){
@@ -193,6 +226,7 @@ function addLine(ev){
   el.className='line new';
   el.innerHTML=`<span class="ts">${ts}</span>${escapeHtml(ev.text)}`;
   feed.appendChild(el);
+  while(feed.children.length>300) feed.firstElementChild.remove();
   autoscrollToBottom(feed);
 }
 function addCard(d){
@@ -207,7 +241,7 @@ function addCard(d){
   }
   const accent=accentFor(d);
   const el=document.createElement('div');
-  el.className='card'; el.style.setProperty('--accent',accent);
+  el.className=`card${d.thumbnail?' has-thumb':''}`; el.style.setProperty('--accent',accent);
   const circ=(d.elemento&&d.circulo)?` · ${CIRC[d.circulo]||d.circulo} círculo`:'';
   const eyebrow=d.elemento
      ? `${d.elemento}${circ}<span class="cat">/ ${CATLABEL[d.category]||d.category}</span>`
@@ -225,6 +259,7 @@ function addCard(d){
   ].filter(Boolean).join('<span>·</span>');
   el.innerHTML=`
      <div class="count"></div>
+      ${d.thumbnail?`<img class="thumb" src="${encodeURI(d.thumbnail)}" alt="${escapeHtml(d.term)}" loading="lazy">`:''}
      <div class="eyebrow">${eyebrow}</div>
      <h3>${escapeHtml(d.term)} ${badge} ${tierBadge}</h3>
      ${d.summary?`<p class="sum">${escapeHtml(d.summary)}</p>`:''}
@@ -233,8 +268,22 @@ function addCard(d){
      <div class="ref">${ref}</div>`;
   cards.appendChild(el);
   recent.unshift({key,n:1,node:el});
-  while(cards.children.length>60) cards.lastChild.remove();
+  while(cards.children.length>60) cards.firstElementChild.remove();
+  while(recent.length>60) recent.pop();
   autoscrollToBottom(cardsScroll);
+}
+function addStory(scene){
+  if(!scene||story.querySelector(`[data-scene="${scene.id}"]`)) return;
+  const seconds=Number(scene.start_s||0);
+  const time=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;
+  const el=document.createElement('article'); el.className='scene'; el.dataset.scene=scene.id;
+  const mechanics=(scene.mechanics||[]).map(item=>escapeHtml(item.term)).join(' · ');
+  el.innerHTML=`<span class="time">${time}</span><h3>${escapeHtml(scene.title)}</h3>
+    <p>${escapeHtml(scene.text)}</p>
+    ${scene.thumbnail?`<img src="${encodeURI(scene.thumbnail)}" alt="${escapeHtml(scene.title)}" loading="lazy">`:''}
+    ${mechanics?`<div class="mechanics">${mechanics}</div>`:''}`;
+  story.appendChild(el);
+  while(story.children.length>120) story.firstElementChild.remove();
 }
 function escapeHtml(s){return (s||'').replace(/[&<>"]/g,c=>(
   {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -252,11 +301,19 @@ function connect(){
     if(msg.type==='event'){
       if(msg.text) addLine(msg);
       (msg.detections||[]).forEach(addCard);
+      addStory(msg.story_scene);
     }
     if(msg.type==='end'){stat.textContent='fim do áudio';}
   };
 }
 connect();
+
+fetch('/story').then(response=>response.json()).then(data=>(data.scenes||[]).forEach(addStory));
+document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(item=>item.classList.toggle('active',item===button));
+  document.getElementById('mechanics-view').classList.toggle('hidden',button.dataset.view!=='mechanics');
+  document.getElementById('story-view').classList.toggle('hidden',button.dataset.view!=='story');
+}));
 
 let healthVersion = null;
 async function watchReload(){

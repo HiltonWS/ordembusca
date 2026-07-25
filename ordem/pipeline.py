@@ -54,19 +54,31 @@ def _canonical_fallback() -> list[dict]:
     ]
 
 
+def current_lexicon(conn) -> list[dict]:
+    """Mescla o banco com o catálogo canônico atual sem exigir reingestão."""
+    stored = dbmod.all_lexicon(conn)
+    seen = {(e["term"], e["category"]) for e in stored}
+    return stored + [
+        entry for entry in _canonical_fallback()
+        if (entry["term"], entry["category"]) not in seen
+    ]
+
+
 class Pipeline:
     """Junta STT + Detector. O áudio é fornecido como fluxo de frames."""
 
     def __init__(self, db_path: str = "ordem.db", model_size: str = "small",
                  device: str = "cpu", compute_type: str = "int8"):
         self.conn = dbmod.connect(db_path)
-        lexicon = dbmod.all_lexicon(self.conn) or _canonical_fallback()
+        lexicon = current_lexicon(self.conn)
+        self.lexicon = lexicon
         self.detector = Detector(lexicon)
         # vocabulário para o viés do Whisper: nomes próprios primeiro
         # (rituais/poderes, que o STT mais erra), depois o resto do sistema
         prio = {"ritual": 0, "poder": 1, "caracteristica": 1, "mascara": 1,
             "trilha": 1, "classe": 1, "sobrevivente": 1, "nex": 1,
-            "armadura": 2, "vestimenta": 2, "acessorio": 2,
+            "armadura": 2, "arma": 2, "item": 2, "vestimenta": 2,
+            "acessorio": 2, "idade": 2,
             "perseguicao": 2, "combate": 2,
             "sinergia": 2, "pericia": 3, "condicao": 4,
             "recurso": 5, "atributo": 6}

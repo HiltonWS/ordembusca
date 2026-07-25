@@ -183,14 +183,19 @@ def test_sync_downloads_only_new_or_changed_supported_files(tmp_path):
         },
         {"id": "image-id", "name": "capa.png", "mimeType": "image/png"},
     ]
-    sync = FakeDriveSync("folder-id", tmp_path / "books", files, {"book-id": first_payload})
+    sync = FakeDriveSync(
+        "folder-id",
+        tmp_path / "books",
+        files,
+        {"book-id": first_payload, "image-id": b"png"},
+    )
 
     downloaded = sync.sync_once()
-    assert [path.name for path in downloaded] == ["Livro.pdf"]
+    assert [path.name for path in downloaded] == ["Livro.pdf", "capa.png"]
     assert downloaded[0].read_bytes() == first_payload
-    assert sync.cached_paths() == downloaded
+    assert sync.cached_paths() == [downloaded[0]]
     assert sync.sync_once() == []
-    assert sync.download_count == 1
+    assert sync.download_count == 2
 
     second_payload = b"segunda versao"
     files[0]["modifiedTime"] = "2026-07-25T11:00:00Z"
@@ -201,7 +206,7 @@ def test_sync_downloads_only_new_or_changed_supported_files(tmp_path):
 
     changed = sync.sync_once()
     assert changed[0].read_bytes() == second_payload
-    assert sync.download_count == 2
+    assert sync.download_count == 3
 
 
 def test_sync_exports_native_google_document_as_docx(tmp_path):

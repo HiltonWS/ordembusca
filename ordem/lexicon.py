@@ -95,6 +95,12 @@ ATRIBUTOS = [
 ]
 
 MECANICAS = [
+    LexEntry("Poder", "poder", aliases=["poderes", "poder paranormal"],
+             summary="Habilidade que concede uma opção ou efeito especial ao personagem."),
+    LexEntry("Item", "item", aliases=["itens", "equipamento"],
+             summary="Objeto com propriedades e usos mecânicos próprios."),
+    LexEntry("Regra de Idade", "idade", aliases=["idade", "faixa etária", "faixa etaria"],
+             summary="A idade define a faixa etária e seus efeitos na criação do personagem."),
     LexEntry("Efeito", "efeito", aliases=["efeitos"],
              summary="Consequência mecânica aplicada por uma habilidade, item ou condição."),
     LexEntry("Classe", "classe", aliases=["classes"],
@@ -132,6 +138,76 @@ MECANICAS = [
              summary="Interação planejada entre duas ou mais mecânicas."),
     LexEntry("Sinergia", "sinergia", aliases=["sinergias"],
              summary="Efeito conjunto em que mecânicas reforçam umas às outras."),
+]
+
+TRILHAS = [
+    LexEntry("Aniquilador", "trilha", meta={"classe": "Combatente"},
+             summary="Trilha de Combatente especializada em uma arma favorita."),
+    LexEntry("Comandante de Campo", "trilha", meta={"classe": "Combatente"},
+             summary="Trilha de Combatente focada em coordenar e apoiar aliados."),
+    LexEntry("Guerreiro", "trilha", meta={"classe": "Combatente"},
+             summary="Trilha de Combatente focada em combate corpo a corpo e manobras."),
+    LexEntry("Operações Especiais", "trilha", aliases=["Operacoes Especiais"],
+             meta={"classe": "Combatente"},
+             summary="Trilha de Combatente focada em mobilidade e ações rápidas."),
+    LexEntry("Tropa de Choque", "trilha", meta={"classe": "Combatente"},
+             summary="Trilha de Combatente focada em resistência e proteção do grupo."),
+    LexEntry("Atirador de Elite", "trilha", meta={"classe": "Especialista"},
+             summary="Trilha de Especialista focada em armas de fogo de longo alcance."),
+    LexEntry("Infiltrador", "trilha", meta={"classe": "Especialista"},
+             summary="Trilha de Especialista focada em furtividade e ataques oportunos."),
+    LexEntry("Médico de Campo", "trilha", aliases=["Medico de Campo"],
+             meta={"classe": "Especialista"},
+             summary="Trilha de Especialista focada em tratamento e suporte médico."),
+    LexEntry("Negociador", "trilha", meta={"classe": "Especialista"},
+             summary="Trilha de Especialista focada em interação social e negociação."),
+    LexEntry("Técnico", "trilha", aliases=["Tecnico"], meta={"classe": "Especialista"},
+             summary="Trilha de Especialista focada em equipamentos e improvisação."),
+    LexEntry("Conduíte", "trilha", aliases=["Conduite"], meta={"classe": "Ocultista"},
+             summary="Trilha de Ocultista focada em ampliar alcance e fluxo de rituais."),
+    LexEntry("Flagelador", "trilha", meta={"classe": "Ocultista"},
+             summary="Trilha de Ocultista que converte vitalidade em poder paranormal."),
+    LexEntry("Graduado", "trilha", meta={"classe": "Ocultista"},
+             summary="Trilha de Ocultista focada em conhecer e preparar mais rituais."),
+    LexEntry("Intuitivo", "trilha", meta={"classe": "Ocultista"},
+             summary="Trilha de Ocultista focada em resistência e percepção paranormal."),
+    LexEntry("Lâmina Paranormal", "trilha",
+             aliases=["Lamina Paranormal", "Lâmina", "Lamina"],
+             meta={"classe": "Ocultista"},
+             summary="Trilha de Ocultista que combina rituais e combate com armas."),
+]
+
+ARMAS = [
+    LexEntry(name, "arma", aliases=aliases, meta={"grupo": group}, summary=summary)
+    for name, aliases, group, summary in [
+        ("Bastão", ["Bastao"], "corpo a corpo", "Arma simples de impacto."),
+        ("Faca", [], "corpo a corpo", "Arma simples leve e ágil."),
+        ("Lança", ["Lanca"], "corpo a corpo", "Arma simples de haste e alcance."),
+        ("Machadinha", [], "corpo a corpo", "Arma simples de corte."),
+        ("Martelo", [], "corpo a corpo", "Arma simples de impacto."),
+        ("Arco", [], "disparo", "Arma simples de disparo."),
+        ("Balestra", [], "disparo", "Arma simples de disparo mecânico."),
+        ("Pistola", [], "fogo", "Arma de fogo curta."),
+        ("Revólver", ["Revolver"], "fogo", "Arma de fogo curta."),
+        ("Acha", [], "corpo a corpo", "Arma tática pesada de corte."),
+        ("Corrente", [], "corpo a corpo", "Arma tática flexível."),
+        ("Espada", [], "corpo a corpo", "Arma tática de corte."),
+        ("Florete", [], "corpo a corpo", "Arma tática ágil de perfuração."),
+        ("Katana", ["Catana"], "corpo a corpo", "Arma tática ágil de corte."),
+        ("Machado", [], "corpo a corpo", "Arma tática de corte."),
+        ("Marreta", [], "corpo a corpo", "Arma tática pesada de impacto."),
+        ("Montante", [], "corpo a corpo", "Arma tática pesada de corte."),
+        ("Motosserra", [], "corpo a corpo", "Arma tática motorizada de corte."),
+        ("Nunchaku", ["Nunchaco"], "corpo a corpo", "Arma tática ágil de impacto."),
+        ("Arco Composto", [], "disparo", "Arma tática de disparo."),
+        ("Espingarda", [], "fogo", "Arma de fogo de alto impacto a curta distância."),
+        ("Fuzil de Assalto", [], "fogo", "Arma de fogo longa automática."),
+        ("Fuzil de Caça", ["Fuzil de Caca"], "fogo", "Arma de fogo longa."),
+        ("Metralhadora", [], "fogo", "Arma de fogo pesada automática."),
+        ("Rifle de Precisão", ["Rifle de Precisao"], "fogo",
+         "Arma de fogo de precisão e longo alcance."),
+        ("Submetralhadora", [], "fogo", "Arma de fogo automática compacta."),
+    ]
 ]
 
 # resumos curados das perícias (curtos e estáveis; o livro descreve em detalhe)
@@ -432,7 +508,7 @@ def canonical_entries(source: Source | None = None) -> list[LexEntry]:
             e.page, e.loc = _find_page_of(source, name)
         out.append(e)
 
-    for e in RECURSOS + ATRIBUTOS + MECANICAS:
+    for e in RECURSOS + ATRIBUTOS + MECANICAS + TRILHAS + ARMAS:
         out.append(e)
     return out
 
@@ -516,6 +592,11 @@ _NAMED_CATEGORIES = {
     "mascara": "mascara",
     "habilidade de mascara": "mascara",
     "armadura": "armadura",
+    "arma": "arma",
+    "item": "item",
+    "poder": "poder",
+    "poder paranormal": "poder",
+    "regra de idade": "idade",
     "trilha": "trilha",
     "vestimenta": "vestimenta",
     "acessorio": "acessorio",

@@ -20,6 +20,8 @@ CORES = {
     "recurso": "\033[93m", "atributo": "\033[92m", "poder": "\033[35m",
     "caracteristica": "\033[94m", "mascara": "\033[95m",
     "armadura": "\033[34m", "trilha": "\033[36m", "vestimenta": "\033[32m",
+    "arma": "\033[31m",
+    "item": "\033[33m", "idade": "\033[96m",
     "acessorio": "\033[33m", "sinergia": "\033[95m", "bonus": "\033[92m",
     "multiplicador": "\033[91m",
     "classe": "\033[96m", "sobrevivente": "\033[93m", "nex": "\033[94m",

@@ -13,6 +13,7 @@ import sys
 
 from ordem import db as dbmod
 from ordem.detect import Detector, format_ref, is_explanation_question
+from ordem.pipeline import current_lexicon
 
 
 def main() -> int:
@@ -31,7 +32,7 @@ def main() -> int:
             print("  " + r["content"].replace("\n", " ")[:300] + "...\n")
         return 0
 
-    det = Detector(dbmod.all_lexicon(conn))
+    det = Detector(current_lexicon(conn))
     detections = det.detect(args.texto)
     if not detections:
         print("Nenhuma mecânica reconhecida.")

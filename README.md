@@ -104,14 +104,22 @@ O navegador abrirá para autorizar leitura dos livros e criação do backup. O
 endereço e a preferência de backup ficam em `.ordem-drive/config.json`; nas
 próximas execuções basta usar `python ingest.py --drive`.
 
-O processo verifica a pasta a cada 5 minutos, ingere apenas PDF, TXT, Markdown
-ou DOCX novos ou alterados e mantém um snapshot consistente de `ordem.db` na
+O processo verifica a pasta a cada 5 minutos, ingere PDF, TXT, Markdown ou DOCX
+novos ou alterados, baixa PNG, JPG, JPEG e WebP como assets visuais e mantém um
+snapshot consistente de `ordem.db` na
 mesma pasta. O banco só é enviado quando seu checksum muda. Use
 `--drive-interval 60` para mudar o intervalo, `--drive-interval 0` para executar
 uma vez ou `--no-drive-db-backup` para desativar e salvar essa preferência.
 Os downloads permanecem no cache local `.ordem-drive/`.
 Todas as subpastas são percorridas recursivamente, inclusive atalhos que apontam
 para outras pastas acessíveis pela conta autorizada.
+
+Imagens em subpastas como `tokens/` e `extras/` são comparadas ao léxico pelo
+nome normalizado: `sopro-do-caos.png` corresponde a `Sopro do Caos`. Se o nome
+não corresponder a nenhum termo, o programa compara localmente o hash visual
+com a maior arte embutida na página do ritual/item. Associações visuais só são
+aceitas com alta semelhança. As imagens e thumbnails ficam em `.ordem-drive/`
+e `.ordem-thumbnails/`, são ignoradas pelo Git e nunca saem da máquina.
 
 Arquivos nativos do Google também são tratados: Google Docs é exportado para
 DOCX e Google Slides para PDF antes da ingestão. Planilhas e outros formatos
@@ -228,6 +236,19 @@ correção sugerida. Eventos de áudio são marcados como `audio` e textos envia
 pelo campo do painel como `manual`. A pasta `transcripts/` é ignorada pelo Git;
 revise consentimento e privacidade antes de gravar outras pessoas.
 
+O painel possui as abas **Mecânicas** e **História**. História transforma cada
+fala em uma cena com título, mecânicas e arte do ritual/item quando disponível.
+Para carregar uma sessão anterior:
+
+```bash
+python server.py --demo --story-transcript transcripts/SESSAO.jsonl
+python server.py --auto-io --assets-dir meus_tokens --story-limit 120
+```
+
+Para evitar crescimento ilimitado de memória, o servidor guarda 300 eventos e
+120 cenas; o navegador mantém no máximo 300 falas, 60 cards e 120 cenas. O JSONL
+opt-in continua completo no disco mesmo quando itens antigos saem da interface.
+
 Abra **http://localhost:8000**. A página mostra, lado a lado, a transmissão
 (transcrição rolando com timestamp) e os **cards de mecânica** — cada um
 codificado pela cor do elemento do ritual (Sangue, Morte, Conhecimento,
@@ -260,6 +281,9 @@ ordem/
   audio.py     captura (microfone/WAV) + segmentação por VAD
   stt.py       transcrição local com faster-whisper
   pipeline.py  orquestração áudio → STT → detecção (Event)
+  thumbnails.py associação de tokens/extras e imagens de páginas
+  transcripts.py registro opt-in em JSONL e Markdown
+  story.py      storyboard limitado construído das transcrições
 ingest.py      CLI de ingestão
 query.py       CLI de detecção/busca (sem áudio)
 listen.py      CLI de escuta ao vivo (microfone ou WAV)
@@ -327,6 +351,8 @@ Cada mecânica detectada traz um resumo curto da regra:
 O detector também reconhece classes (Combatente, Especialista, Ocultista e
 Sobrevivente), marcos e alterações de NEX, perseguições, combate,
 características únicas, habilidades de máscara, armaduras, trilhas,
+nomes de armas,
+itens, poderes paranormais, faixas etárias,
 vestimentas, acessórios, combinações e sinergias. Bônus
 numéricos e multiplicadores de dano são extraídos diretamente da fala, incluindo
 o valor e o contexto, por exemplo `fornece +5 em Furtividade` e `dano dobrado`.
@@ -343,6 +369,9 @@ linha explícita no TXT, Markdown ou DOCX:
 [Combate: Maré Violenta] - Regra especial usada durante o combate.
 [Habilidade de Máscara: Face do Carrasco] - Ao ativar, o dano é dobrado.
 [Armadura: Couraça Abissal] - Fornece resistência a dano 5.
+[Arma: Sabre Abissal] - Arma homebrew das Profundezas.
+[Item: Relógio de Lodo] - Item que altera o fluxo temporal.
+[Poder Paranormal: Pulso Abissal] - Poder paranormal de Morte.
 [Trilha: Navegador do Oculto] - Concede habilidades em marcos de NEX.
 [Vestimenta: Casaco de Lodo] - Fornece +5 em Furtividade.
 [Acessório: Lente Espectral] - Auxilia testes de Percepção.
@@ -356,6 +385,8 @@ Perguntas como `o que fatigado dá?`, `como funciona a condição sangrando?` ou
 locais. O card mostra o resumo e até três trechos relevantes com fonte e página.
 Testes de resistência falados, como `Fortitude DT 15 para não ficar fatigado`,
 também geram um card próprio com perícia, DT e finalidade.
+Frases como `personagem com idade de 47 anos` geram a faixa etária correspondente
+e `ocultista lâmina com NEX 50%` reconhece trilha e percentual de NEX.
 
 <p align="center">
   <img src="docs/screenshots/painel-versoes.png" alt="Cards com versoes faladas" width="100%">

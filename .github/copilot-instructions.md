@@ -26,6 +26,8 @@ de voz, o processamento pode ser inteiramente local.
 - `ordem/stt.py`: transcricao local com faster-whisper.
 - `ordem/pipeline.py`: orquestracao do audio ate os eventos detectados.
 - `ordem/transcripts.py`: registro opt-in em JSONL e Markdown para revisao.
+- `ordem/thumbnails.py`: associa assets pelo nome ou semelhanca visual local.
+- `ordem/story.py`: transforma transcricoes em storyboard limitado.
 - `web/index.html`: painel web ao vivo.
 - `tests/`: testes do detector, audio, STT, Drive, colunas e glifos de dados.
 
@@ -37,6 +39,8 @@ de voz, o processamento pode ser inteiramente local.
   do Drive e a preferencia de backup ficam apenas no config local ignorado.
 - Nunca grave transcricoes por padrao. O servidor so persiste conversas quando
   `--transcript-log DIRETORIO` for informado; mantenha `transcripts/` ignorado.
+- Nunca versione tokens, extras ou thumbnails extraidos dos livros. Mantenha
+  `tokens/`, `extras/` e `.ordem-thumbnails/` locais e ignorados.
 - Preserve o funcionamento offline e evite introduzir servicos externos no
   caminho principal.
 - O detector deve continuar tolerante a erros de transcricao em portugues,
@@ -46,6 +50,9 @@ de voz, o processamento pode ser inteiramente local.
   Preserve tambem `classe`, `sobrevivente`, `nex`, `perseguicao` e `combate`.
   Preserve `efeito` e `dt`; perguntas explicativas sobre efeitos/condicoes devem
   buscar contexto ampliado no FTS local, incluindo fonte e pagina.
+  Preserve nomes canônicos de trilhas e armas; termos ambíguos como `faca` e
+  `lança` só devem ser armas quando houver contexto de equipamento ou ataque.
+  Preserve itens, poderes paranormais e faixas da regra de idade.
   Entradas homebrew nomeadas usam `[Categoria: Nome] - descricao`; bonus e
   multiplicadores de dano tambem sao detectados estruturalmente na fala.
 - Preserve suporte a conteudo homebrew, inclusive elementos customizados alem
@@ -88,6 +95,8 @@ python server.py --demo
 python server.py --mic
 python server.py --auto-io
 python server.py --auto-io --transcript-log transcripts
+python server.py --auto-io --assets-dir extras --story-limit 120
+python server.py --demo --story-transcript transcripts/SESSAO.jsonl
 ```
 
 Na primeira configuracao do Drive, use um cliente OAuth do tipo Desktop e
@@ -105,6 +114,9 @@ Atalhos do Drive devem ser resolvidos por `shortcutDetails.targetId`, incluindo
 ID do atalho como chave do cache/estado e o ID do alvo apenas para download.
 A sincronizacao deve percorrer subpastas recursivamente, incluindo atalhos para
 pastas, com conjunto de IDs visitados para evitar ciclos.
+Imagens PNG/JPG/JPEG/WebP do Drive sao assets, nao fontes textuais. Associe-as
+ao lexico por nome normalizado e use comparacao perceptual local apenas quando
+nao houver nome correspondente.
 Um erro 404 da API ao validar a pasta normalmente significa ID incorreto ou
 conta OAuth sem acesso. Oriente a compartilhar a pasta com a conta autorizada
 ou remover `.ordem-drive/token.json` para escolher outra conta.
