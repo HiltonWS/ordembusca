@@ -97,6 +97,9 @@ python ingest.py --force livro.pdf              # reprocessa uma fonte
 python ingest.py --drive-folder "https://drive.google.com/drive/folders/SEU_ID" --drive-db-backup
 ```
 
+Links compartilhados completos também são aceitos, inclusive os que contêm
+`resourcekey`. Prefira colar o link inteiro em vez de extrair apenas o ID.
+
 O navegador abrirá para autorizar leitura dos livros e criação do backup. O
 endereço e a preferência de backup ficam em `.ordem-drive/config.json`; nas
 próximas execuções basta usar `python ingest.py --drive`.
@@ -107,6 +110,10 @@ mesma pasta. O banco só é enviado quando seu checksum muda. Use
 `--drive-interval 60` para mudar o intervalo, `--drive-interval 0` para executar
 uma vez ou `--no-drive-db-backup` para desativar e salvar essa preferência.
 Os downloads permanecem no cache local `.ordem-drive/`.
+
+Se aparecer **pasta não encontrada ou sem acesso**, confirme que a pasta foi
+compartilhada com a mesma conta escolhida na autorização. Para trocar de conta,
+apague `.ordem-drive/token.json` e execute `python ingest.py --drive` novamente.
 
 **Detectar mecânicas numa frase** (simula o que a voz vai enviar):
 

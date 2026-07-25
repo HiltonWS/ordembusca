@@ -6,7 +6,7 @@ import json
 import re
 import sqlite3
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 SCOPES = [
     "https://www.googleapis.com/auth/drive.readonly",
@@ -21,18 +21,25 @@ class DriveSetupError(RuntimeError):
     """Configuração ou dependência necessária para o Drive está ausente."""
 
 
-def folder_id_from(value: str) -> str:
-    """Aceita um ID ou uma URL de pasta do Google Drive."""
+def folder_access_from(value: str) -> tuple[str, str | None]:
+    """Extrai ID e resource key de um ID ou link compartilhado de pasta."""
     value = value.strip()
     parsed = urlparse(value)
+    resource_key = None
     if parsed.scheme:
         match = re.search(r"/folders/([^/?]+)", parsed.path)
         if not match:
             raise DriveSetupError("URL do Drive inválida: use o link de uma pasta")
         value = match.group(1)
+        resource_key = parse_qs(parsed.query).get("resourcekey", [None])[0]
     if not re.fullmatch(r"[A-Za-z0-9_-]+", value):
         raise DriveSetupError("ID da pasta do Drive inválido")
-    return value
+    return value, resource_key
+
+
+def folder_id_from(value: str) -> str:
+    """Aceita um ID ou uma URL de pasta do Google Drive."""
+    return folder_access_from(value)[0]
 
 
 def load_drive_config(path: str | Path = DEFAULT_CONFIG_PATH) -> dict:
@@ -73,12 +80,20 @@ class DriveSync:
         token_path: str | Path = ".ordem-drive/token.json",
         service=None,
     ):
-        self.folder_id = folder_id_from(folder)
+        self.folder_id, self.folder_resource_key = folder_access_from(folder)
         self.cache_dir = Path(cache_dir)
         self.credentials_path = Path(credentials_path)
         self.token_path = Path(token_path)
         self.state_path = self.cache_dir.parent / "state.json"
         self._service = service
+        self._folder_validated = False
+
+    def _execute_folder_request(self, request):
+        if self.folder_resource_key:
+            request.headers["X-Goog-Drive-Resource-Keys"] = (
+                f"{self.folder_id}/{self.folder_resource_key}"
+            )
+        return request.execute()
 
     def _get_service(self):
         if self._service is not None:
@@ -116,19 +131,46 @@ class DriveSync:
         self._service = build("drive", "v3", credentials=credentials, cache_discovery=False)
         return self._service
 
+    def _validate_folder(self) -> None:
+        if self._folder_validated:
+            return
+        try:
+            request = self._get_service().files().get(
+                fileId=self.folder_id,
+                fields="id,name,mimeType",
+                supportsAllDrives=True,
+            )
+            folder = self._execute_folder_request(request)
+        except Exception as exc:  # noqa: BLE001
+            status = getattr(getattr(exc, "resp", None), "status", None)
+            if status == 404:
+                raise DriveSetupError(
+                    "pasta não encontrada ou sem acesso para a conta autorizada. "
+                    "Compartilhe a pasta com essa conta ou apague "
+                    ".ordem-drive/token.json e autorize a conta correta"
+                ) from exc
+            raise
+        if folder.get("mimeType") != FOLDER_MIME:
+            raise DriveSetupError(
+                f"o ID configurado pertence a um arquivo, não a uma pasta: {folder.get('name')}"
+            )
+        self._folder_validated = True
+
     def _list_files(self) -> list[dict]:
+        self._validate_folder()
         service = self._get_service()
         files = []
         page_token = None
         while True:
-            response = service.files().list(
+            request = service.files().list(
                 q=f"'{self.folder_id}' in parents and trashed = false",
                 fields="nextPageToken, files(id,name,mimeType,modifiedTime,md5Checksum)",
                 pageToken=page_token,
                 spaces="drive",
                 supportsAllDrives=True,
                 includeItemsFromAllDrives=True,
-            ).execute()
+            )
+            response = self._execute_folder_request(request)
             files.extend(response.get("files", []))
             page_token = response.get("nextPageToken")
             if not page_token:
@@ -152,7 +194,8 @@ class DriveSync:
                 _, done = downloader.next_chunk()
 
     def _find_remote_database(self, name: str) -> dict | None:
-        response = self._get_service().files().list(
+        self._validate_folder()
+        request = self._get_service().files().list(
             q=(
                 f"'{self.folder_id}' in parents and trashed = false and "
                 "appProperties has { key='ordemBusca' and value='database' }"
@@ -161,7 +204,8 @@ class DriveSync:
             spaces="drive",
             supportsAllDrives=True,
             includeItemsFromAllDrives=True,
-        ).execute()
+        )
+        response = self._execute_folder_request(request)
         return next(
             (item for item in response.get("files", []) if item.get("name") == name),
             None,

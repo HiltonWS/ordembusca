@@ -8,6 +8,7 @@ import pytest
 from ordem.drive import (
     DriveSetupError,
     DriveSync,
+    folder_access_from,
     folder_id_from,
     load_drive_config,
     save_drive_config,
@@ -22,6 +23,9 @@ class FakeDriveSync(DriveSync):
         self.download_count = 0
         self.remote_database = None
         self.upload_count = 0
+
+    def _validate_folder(self) -> None:
+        pass
 
     def _list_files(self) -> list[dict]:
         return self.files
@@ -54,6 +58,47 @@ def test_folder_id_accepts_id_and_url():
     assert folder_id_from("https://drive.google.com/drive/folders/abc_123?usp=sharing") == "abc_123"
     with pytest.raises(DriveSetupError):
         folder_id_from("https://drive.google.com/file/d/abc/view")
+
+
+def test_folder_link_preserves_resource_key():
+    folder_id, resource_key = folder_access_from(
+        "https://drive.google.com/drive/folders/abc_123?resourcekey=key-456&usp=sharing"
+    )
+    assert folder_id == "abc_123"
+    assert resource_key == "key-456"
+
+    class Request:
+        headers = {}
+
+        def execute(self):
+            return {"ok": True}
+
+    sync = DriveSync(
+        "https://drive.google.com/drive/folders/abc_123?resourcekey=key-456"
+    )
+    request = Request()
+    assert sync._execute_folder_request(request) == {"ok": True}
+    assert request.headers["X-Goog-Drive-Resource-Keys"] == "abc_123/key-456"
+
+
+def test_validate_folder_explains_missing_access():
+    class MissingRequest:
+        def execute(self):
+            error = RuntimeError("not found")
+            error.resp = type("Response", (), {"status": 404})()
+            raise error
+
+    class MissingFiles:
+        def get(self, **kwargs):
+            return MissingRequest()
+
+    class MissingService:
+        def files(self):
+            return MissingFiles()
+
+    sync = DriveSync("folder-id", service=MissingService())
+    with pytest.raises(DriveSetupError, match="sem acesso para a conta autorizada"):
+        sync._validate_folder()
 
 
 def test_drive_config_remembers_folder_and_database_preference(tmp_path):

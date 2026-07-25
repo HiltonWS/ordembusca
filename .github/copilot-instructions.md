@@ -85,6 +85,11 @@ salve o JSON como `credentials.json`. O endereco informado por
 `--drive`. Com `--drive-db-backup`, um snapshot consistente de `ordem.db` e
 enviado somente quando o checksum mudar. A sincronizacao do banco e local para
 Drive e nao restaura/sobrescreve automaticamente uma base local.
+Links completos de pasta sao aceitos e devem preservar `resourcekey`; prefira
+o link compartilhado inteiro ao ID quando essa chave estiver presente.
+Um erro 404 da API ao validar a pasta normalmente significa ID incorreto ou
+conta OAuth sem acesso. Oriente a compartilhar a pasta com a conta autorizada
+ou remover `.ordem-drive/token.json` para escolher outra conta.
 
 Em Codespaces ou ambientes sem dispositivos de audio, use `--demo` ou `--wav`.
 Para expor o servidor em Codespaces, use `--host 0.0.0.0`.
