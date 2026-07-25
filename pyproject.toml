@@ -30,6 +30,11 @@ web = [
     "websockets>=12.0",
     "pydantic>=2.0",
 ]
+drive = [
+    "google-api-python-client>=2.0",
+    "google-auth-httplib2>=0.2",
+    "google-auth-oauthlib>=1.2",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.4",
@@ -47,7 +52,7 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_detector.py", "test_audio_mix.py", "test_stt_quality.py", "test_dice_glyphs.py", "test_columns.py"]
+python_files = ["test_*.py"]
 
 [tool.setuptools]
 packages = ["ordem"]

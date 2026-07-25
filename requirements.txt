@@ -3,6 +3,11 @@ PyMuPDF>=1.24
 rapidfuzz>=3.0
 python-docx>=1.1        # ingestão de fontes .docx (ex: homebrew em Word)
 
+# Google Drive (OAuth local, acesso somente leitura)
+google-api-python-client>=2.0
+google-auth-httplib2>=0.2
+google-auth-oauthlib>=1.2
+
 # Fase 2 — voz (STT local, offline após 1º download do modelo)
 faster-whisper>=1.0        # transcrição local (CTranslate2)
 webrtcvad-wheels>=2.0      # detecção de voz / segmentação (wheels prontas)

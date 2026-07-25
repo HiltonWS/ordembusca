@@ -6,6 +6,9 @@
 *.db-journal
 uploads/
 livros/
+.ordem-drive/
+credentials.json
+client_secret*.json
 
 # Python
 __pycache__/

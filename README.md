@@ -80,6 +80,24 @@ python ingest.py minha_pasta_de_livros/        # ingere tudo da pasta (pdf/txt/d
 python ingest.py --force livro.pdf              # reprocessa uma fonte
 ```
 
+**Sincronizar uma pasta privada do Google Drive automaticamente:**
+
+1. No Google Cloud Console, ative a Google Drive API e crie um cliente OAuth
+   do tipo **Aplicativo para computador**.
+2. Baixe o JSON do cliente como `credentials.json` na raiz do projeto. Esse
+   arquivo e o token de acesso são ignorados pelo Git.
+3. Inicie a sincronização usando o link ou o ID da pasta:
+
+```bash
+python ingest.py --drive-folder "https://drive.google.com/drive/folders/SEU_ID"
+```
+
+Na primeira execução, o navegador abrirá para autorizar acesso somente leitura.
+O processo verifica a pasta a cada 5 minutos e ingere apenas PDF, TXT, Markdown
+ou DOCX novos ou alterados. Use `--drive-interval 60` para mudar o intervalo ou
+`--drive-interval 0` para sincronizar uma única vez. Os downloads permanecem no
+cache local `.ordem-drive/` e não são enviados ao repositório.
+
 **Detectar mecânicas numa frase** (simula o que a voz vai enviar):
 
 ```bash
