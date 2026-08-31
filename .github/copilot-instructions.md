@@ -1,118 +1,160 @@
-# Instruções do GitHub Copilot — Aurora Local
+# Ordem Busca - instrucoes para agentes de IA
 
-> Copie este arquivo para `.github/copilot-instructions.md` no repositório.
+## Contexto do projeto
 
-## Contexto obrigatório
+Este repositorio implementa um sistema local para detectar mecanicas de Ordem
+Paranormal a partir de texto ou audio. O fluxo em tempo real e:
 
-Este repositório implementa Aurora Local: uma assistente/persona ficcional local, portátil, privada e governada por aprovação humana. Leia `docs/product/AURORA_LOCAL_ESPECIFICACAO_COMPLETA.md` antes de propor ou alterar código.
+`audio -> VAD -> faster-whisper -> detector fuzzy/fonetico -> terminal ou painel web`
 
-Hilton é a autoridade humana para aprovação de mudanças canônicas. O caderno canônico é a fonte de verdade; conversa, código, modelo e conteúdo externo não podem alterá-lo diretamente.
+O projeto requer Python 3.11 ou superior. Depois do primeiro download do modelo
+de voz, o processamento pode ser inteiramente local.
 
-## Regras invariáveis
+## Mapa do codigo
 
-- Segurança e privacidade têm prioridade sobre conveniência.
-- Nunca alegue execução, leitura, sincronização ou controle sem evidência verificável.
-- O LLM interpreta linguagem e produz resposta ou intenção tipada; nunca executa ferramenta diretamente.
-- Toda intenção passa por schema, allowlist, policy engine, classificação R0–R5, confirmação quando exigida, idempotência e verificação.
-- Ambiguidade, conflito de versão, alvo incerto, timeout ou validação incompleta devem falhar de forma segura.
-- Nunca armazenar segredos em Git, prompts, memória, logs, exemplos, fixtures, Drive ou mensagens de erro.
-- Nunca alterar o cânone silenciosamente. Criar proposta com origem, motivo, versão-base e diff; aguardar aprovação explícita.
-- Nunca resolver conflito escolhendo uma versão silenciosamente.
-- Não sincronizar banco SQLite ativo, modelos, caches, secrets, áudio bruto ou biometria.
-- O caderno canônico usa fluxo unidirecional Library → Drive → projeção local somente leitura. Não incluí-lo em `rclone bisync`.
-- Home Assistant, Google Home, voz e ferramentas externas começam desabilitados e negados por padrão.
-- Reconhecimento de voz não é autenticação suficiente para ação sensível.
-- Não usar `--no-sandbox`, desabilitar TLS/autenticação, abrir bind público ou reduzir controles para contornar erro.
+- `ingest.py`: CLI de ingestao local e sincronizacao automatica com Drive.
+- `query.py`: CLI de busca e deteccao textual sem audio.
+- `listen.py`: CLI de escuta por microfone, loopback ou WAV.
+- `server.py`: servidor FastAPI e WebSocket do painel em tempo real.
+- `ordem/extract.py`: extracao e limpeza do texto das fontes.
+- `ordem/chunk.py`: divisao do texto com metadados de pagina ou secao.
+- `ordem/lexicon.py`: extracao de rituais, poderes e termos canonicos.
+- `ordem/db.py`: persistencia SQLite e busca FTS5.
+- `ordem/drive.py`: OAuth, cache dos livros e backup SQLite no Google Drive.
+- `ordem/detect.py`: deteccao fuzzy e fonetica de mecanicas.
+- `ordem/audio.py`: captura, mixagem, reamostragem e VAD.
+- `ordem/stt.py`: transcricao local com faster-whisper.
+- `ordem/pipeline.py`: orquestracao do audio ate os eventos detectados.
+- `ordem/transcripts.py`: registro opt-in em JSONL e Markdown para revisao.
+- `ordem/thumbnails.py`: associa assets pelo nome ou semelhanca visual local.
+- `ordem/story.py`: agrupa transcricoes em momentos renovaveis e limitados.
+- `ordem/story_images.py`: ilustra momentos localmente em bitmaps PNG.
+- `web/index.html`: painel web ao vivo.
+- `tests/`: testes do detector, audio, STT, Drive, colunas e glifos de dados.
 
-## Arquitetura esperada
+## Regras importantes
 
-- Backend principal: Java 21 + Spring Boot + Gradle Wrapper.
-- Frontend: React + TypeScript + Vite.
-- Dados: SQLite operacional e Markdown/Git para artefatos revisáveis.
-- Contratos: OpenAPI e JSON Schema.
-- Modelo: Ollama local por gateway estreito em loopback.
-- Voz futura: serviço isolado e substituível.
-- Automação futura: adaptador Home Assistant atrás do tool broker.
+- Nunca adicione PDFs, DOCX de livros ou bancos `*.db` ao repositorio. Eles
+  podem conter material protegido por direitos autorais e dados derivados.
+- Nunca versione `credentials.json`, tokens OAuth ou `.ordem-drive/`. A pasta
+  do Drive e a preferencia de backup ficam apenas no config local ignorado.
+- Nunca grave transcricoes por padrao. O servidor so persiste conversas quando
+  `--transcript-log DIRETORIO` for informado; mantenha `transcripts/` ignorado.
+- Nunca versione tokens, extras ou thumbnails extraidos dos livros. Mantenha
+  `tokens/`, `extras/` e `.ordem-thumbnails/` locais e ignorados.
+- Preserve o funcionamento offline e evite introduzir servicos externos no
+  caminho principal.
+- O detector deve continuar tolerante a erros de transcricao em portugues,
+  usando aproximacao fuzzy e fonetica.
+- Preserve as categorias expandidas: `caracteristica`, `mascara`, `armadura`,
+  `trilha`, `vestimenta`, `acessorio`, `sinergia`, `bonus` e `multiplicador`.
+  Preserve tambem `classe`, `sobrevivente`, `nex`, `perseguicao` e `combate`.
+  Preserve `efeito` e `dt`; perguntas explicativas sobre efeitos/condicoes devem
+  buscar contexto ampliado no FTS local, incluindo fonte e pagina.
+  Preserve nomes canônicos de trilhas e armas; termos ambíguos como `faca` e
+  `lança` só devem ser armas quando houver contexto de equipamento ou ataque.
+  Preserve itens, poderes paranormais e faixas da regra de idade.
+  Entradas homebrew nomeadas usam `[Categoria: Nome] - descricao`; bonus e
+  multiplicadores de dano tambem sao detectados estruturalmente na fala.
+- Preserve suporte a conteudo homebrew, inclusive elementos customizados alem
+  dos cinco elementos oficiais.
+- Mantenha referencias de origem por livro e pagina, ou por fonte e secao.
+- Prefira alteracoes pequenas e consistentes com as abstracoes existentes.
+- Nao altere arquivos ou comportamento fora do escopo solicitado.
+- Sempre atualize este arquivo e o `README.md` quando comandos, dependencias,
+  arquitetura ou rotinas operacionais forem alterados.
 
-Não introduza framework, banco, broker, nuvem ou serviço novo sem ADR e aprovação.
+## Dependencias
 
-## Limites de implementação
+- Nucleo: PyMuPDF, rapidfuzz e python-docx.
+- Voz: faster-whisper, webrtcvad-wheels, sounddevice, soundfile e numpy.
+- Web: FastAPI, Uvicorn, watchfiles, websockets e Pydantic.
+- Drive: google-api-python-client, google-auth-httplib2 e google-auth-oauthlib.
+- Desenvolvimento: pytest, Ruff e build.
 
-- Não criar shell genérico, `eval`, execução dinâmica ou URL/caminho arbitrário controlado pelo modelo.
-- Resolver e validar caminhos contra raízes permitidas; bloquear traversal e symlink escape.
-- Fixar versões por toolchain/lockfile; não usar `latest`.
-- Não executar migração destrutiva automaticamente.
-- Escrever de forma atômica e manter rollback para dados importantes.
-- Usar loopback por padrão; acesso remoto exige projeto separado de autenticação, TLS e rede privada.
-- Usar códigos de erro estáveis e mensagens redigidas.
-- Não registrar prompts completos ou payloads de integração por padrão.
-- A interface deve distinguir resposta do modelo de resultado confirmado por ferramenta.
+Instale o ambiente completo com:
 
-## Forma de trabalhar
+```bash
+pip install -r requirements.txt
+```
 
-Para cada issue:
+## Comandos de operacao
 
-1. Resuma o objetivo e o que fica fora do escopo.
-2. Liste arquivos que pretende alterar.
-3. Identifique contratos, riscos e decisões abertas.
-4. Escreva testes positivos e negativos.
-5. Faça a menor mudança completa e revisável.
-6. Rode build, testes, lint e scanner de segredos.
-7. Mostre limitações e trabalho restante.
+```bash
+python ingest.py <arquivos-ou-pastas>
+python ingest.py --force <fonte>
+python ingest.py --drive-folder <URL-ou-ID> --drive-db-backup
+python ingest.py --drive
+python ingest.py --drive --drive-interval 0
+python ingest.py --drive-books-only --force --drive-interval 0
+python query.py "texto da mesa"
+python query.py --search "termo"
+python listen.py --list-mics
+python listen.py --mic
+python listen.py --auto-io
+python listen.py --wav sessao.wav
+python server.py --demo
+python server.py --mic
+python server.py --auto-io
+python server.py --auto-io --transcript-log transcripts
+python server.py --auto-io --assets-dir extras --story-limit 120 --story-moment 20
+python server.py --demo --story-transcript transcripts/SESSAO.jsonl
+```
 
-Não altere arquivos fora da issue sem explicar a necessidade. Não faça refatoração ampla junto com mudança funcional.
+Na primeira configuracao do Drive, use um cliente OAuth do tipo Desktop e
+salve o JSON como `credentials.json`. O endereco informado por
+`--drive-folder` e lembrado em `.ordem-drive/config.json`; depois use apenas
+`--drive`. Com `--drive-db-backup`, um snapshot consistente de `ordem.db` e
+enviado somente quando o checksum mudar. A sincronizacao do banco e local para
+Drive e nao restaura/sobrescreve automaticamente uma base local.
+Links completos de pasta sao aceitos e devem preservar `resourcekey`; prefira
+o link compartilhado inteiro ao ID quando essa chave estiver presente.
+Arquivos Google Docs devem ser exportados para DOCX e Google Slides para PDF;
+nao use `get_media` para tipos nativos `application/vnd.google-apps.*`.
+Atalhos do Drive devem ser resolvidos por `shortcutDetails.targetId`, incluindo
+`targetResourceKey`, antes de baixar ou decidir o formato de exportacao. Use o
+ID do atalho como chave do cache/estado e o ID do alvo apenas para download.
+A sincronizacao deve percorrer subpastas recursivamente, incluindo atalhos para
+pastas, com conjunto de IDs visitados para evitar ciclos.
+O CLI de ingestao deve mostrar progresso por arquivo e etapa; downloads do
+Drive devem mostrar bytes e percentual quando a API fornecer tamanho total.
+Imagens PNG/JPG/JPEG/WebP do Drive sao assets, nao fontes textuais. Associe-as
+ao lexico por nome normalizado e use comparacao perceptual local apenas quando
+nao houver nome correspondente.
+Um erro 404 da API ao validar a pasta normalmente significa ID incorreto ou
+conta OAuth sem acesso. Oriente a compartilhar a pasta com a conta autorizada
+ou remover `.ordem-drive/token.json` para escolher outra conta.
 
-## Requisitos de código
+Em Codespaces ou ambientes sem dispositivos de audio, use `--demo` ou `--wav`.
+Para expor o servidor em Codespaces, use `--host 0.0.0.0`.
 
-- Preferir tipos explícitos, objetos imutáveis e funções pequenas nas fronteiras de segurança.
-- Validar toda entrada externa; rejeitar campos desconhecidos em intenções sensíveis.
-- Não confiar em texto do modelo, HTML, Markdown, nomes de arquivo, metadados ou respostas de integração.
-- Usar relógio injetável e IDs determinísticos em testes.
-- Projetar mutações com idempotency key e concorrência otimista.
-- Separar domínio, aplicação, infraestrutura e adaptadores.
-- Manter adaptadores atrás de interfaces estreitas.
-- Tratar resultado `unknown` separadamente de `success` e `failure`.
-- Sanitizar logs e erros em testes automatizados.
+## Rotina para alteracoes
 
-## Testes mínimos por mudança sensível
+1. Leia o modulo que controla diretamente o comportamento solicitado e um
+   teste ou chamada proxima antes de editar.
+2. Respeite o estado atual do Git e nao reverta alteracoes do usuario.
+3. Adicione ou ajuste testes proporcionais ao risco da mudanca.
+4. Execute primeiro o teste mais especifico para o trecho alterado.
+5. Para cada funcionalidade nova, crie testes que cubram o comportamento
+  esperado e os casos de erro relevantes.
+6. Antes de concluir, execute as validacoes gerais quando forem aplicaveis:
 
-Inclua, conforme aplicável:
+```bash
+pytest
+ruff check .
+```
 
-- autorização permitida e negada;
-- schema inválido e campo extra;
-- prompt injection em conteúdo externo;
-- replay/duplicação e corrida;
-- timeout e resultado desconhecido;
-- path traversal e symlink;
-- segredo em cabeçalho, URL, payload e exceção;
-- conflito de versão canônica;
-- indisponibilidade do Ollama/SQLite/adaptador;
-- rollback ou restauração.
+O Ruff usa limite de 100 colunas, alvo Python 3.11 e regras `E`, `F`, `W` e `I`.
+Consulte o `README.md` quando precisar de detalhes de uso, ingestao, audio ou
+arquitetura que nao estejam resumidos aqui.
 
-## Proibições para Agent mode
+## Git
 
-Sem confirmação explícita de Hilton, não:
-
-- apagar ou sobrescrever dados;
-- formatar disco/partição ou alterar bootloader;
-- instalar pacotes no sistema;
-- executar scripts baixados;
-- acessar ou mover credenciais;
-- publicar código, release, serviço ou porta;
-- modificar firewall, systemd, firmware ou Secure Boot;
-- chamar Home Assistant/Google Home;
-- editar o caderno canônico;
-- iniciar sincronização real; primeiro produzir dry-run revisável.
-
-## Definition of Done de uma issue
-
-Uma issue termina somente quando:
-
-- critérios de aceite estão satisfeitos;
-- testes positivos e negativos passam;
-- logs não vazam segredos;
-- erro e recuperação foram considerados;
-- contratos e documentação foram atualizados;
-- `git diff` não contém mudanças estranhas ao escopo;
-- nenhuma decisão aberta foi inventada;
-- sucesso só é declarado com evidência.
+- Ao concluir e validar uma alteracao solicitada, crie um commit com mensagem
+  objetiva e envie a branch atual ao remoto com `git push`.
+- Antes de qualquer commit ou push, execute os testes e verificacoes de
+  qualidade aplicaveis. Se alguma validacao falhar, investigue e corrija a
+  causa antes de publicar; nunca envie alteracoes com testes quebrados.
+- Nao inclua no commit alteracoes preexistentes ou fora do escopo.
+- Nao faca commit ou push apenas quando o usuario pedir explicitamente para nao
+  fazer, ou quando houver um bloqueio de autenticacao, permissao ou seguranca.
